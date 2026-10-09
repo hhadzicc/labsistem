@@ -1,0 +1,53 @@
+services:
+  - type: web
+    name: labsistem-api
+    runtime: docker
+    plan: free
+    region: frankfurt
+    dockerfilePath: ./Projekat/LabSistem.backend/LABsistem.Presentation/Dockerfile
+    dockerContext: ./Projekat/LabSistem.backend
+    healthCheckPath: /health
+    autoDeployTrigger: checksPass
+    envVars:
+      - key: ASPNETCORE_ENVIRONMENT
+        value: Production
+      - key: ASPNETCORE_URLS
+        value: http://0.0.0.0:10000
+      - key: ASPNETCORE_FORWARDEDHEADERS_ENABLED
+        value: "true"
+      - key: ConnectionStrings__Default
+        sync: false
+      - key: Jwt__Key
+        generateValue: true
+      - key: FRONTEND_BASE_URL
+        value: https://labsistem-app.onrender.com
+      - key: SeedData__DemoUsers
+        value: "false"
+      - key: BootstrapAdmin__Enabled
+        sync: false
+      - key: BootstrapAdmin__Name
+        sync: false
+      - key: BootstrapAdmin__Email
+        sync: false
+      - key: BootstrapAdmin__Username
+        sync: false
+      - key: BootstrapAdmin__Password
+        sync: false
+      - key: TZ
+        value: Europe/Sarajevo
+
+  - type: web
+    name: labsistem-app
+    runtime: static
+    buildCommand: cd Projekat/LABsistem.Frontend && CYPRESS_INSTALL_BINARY=0 npm ci && npm run build
+    staticPublishPath: ./Projekat/LABsistem.Frontend/dist
+    autoDeployTrigger: checksPass
+    envVars:
+      - key: VITE_API_BASE_URL
+        value: https://labsistem-api.onrender.com/api
+      - key: VITE_API_TIMEOUT_MS
+        value: "60000"
+    routes:
+      - type: rewrite
+        source: /*
+        destination: /index.html

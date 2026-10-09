@@ -9,14 +9,21 @@ import {
   shouldRefreshAccessToken,
 } from "../auth/session";
 
+const configuredTimeout = Number(import.meta.env.VITE_API_TIMEOUT_MS);
+const requestTimeout = Number.isFinite(configuredTimeout) && configuredTimeout > 0
+  ? configuredTimeout
+  : import.meta.env.PROD
+    ? 60000
+    : 6000;
+
 const api = axios.create({
   baseURL: import.meta.env.VITE_API_BASE_URL || "/api",
-  timeout: 6000
+  timeout: requestTimeout
 });
 
 const authApi = axios.create({
   baseURL: import.meta.env.VITE_API_BASE_URL || "/api",
-  timeout: 6000
+  timeout: requestTimeout
 });
 
 let refreshPromise = null;

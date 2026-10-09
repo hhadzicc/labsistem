@@ -15,6 +15,7 @@ using Microsoft.EntityFrameworkCore;
 using Microsoft.IdentityModel.Tokens;
 using LABsistem.Api.Validators;
 using LABsistem.Presentation.BackgroundServices;
+using LABsistem.Presentation.Configuration;
 using Microsoft.AspNetCore.Authorization;
 
 var builder = WebApplication.CreateBuilder(args);
@@ -28,12 +29,40 @@ if (!builder.Environment.IsEnvironment("Testing") && string.IsNullOrWhiteSpace(c
     throw new InvalidOperationException("ConnectionStrings:Default nije konfigurisan.");
 }
 
+if (!string.IsNullOrWhiteSpace(connectionString))
+{
+    connectionString = DatabaseConnectionString.Normalize(connectionString);
+}
+
 var jwtSettings = builder.Configuration.GetSection("Jwt").Get<JwtSettings>()
     ?? throw new InvalidOperationException("JWT konfiguracija nije pronadjena.");
 
 if (string.IsNullOrWhiteSpace(jwtSettings.Key) || jwtSettings.Key.Length < 32)
 {
     throw new InvalidOperationException("Jwt:Key mora biti konfigurisan i imati najmanje 32 karaktera.");
+}
+
+var allowedOrigins = builder.Configuration
+    .GetSection("Cors:AllowedOrigins")
+    .Get<string[]>() ?? [];
+
+var frontendBaseUrl = builder.Configuration["FRONTEND_BASE_URL"]
+    ?? builder.Configuration["FrontendBaseUrl"];
+
+if (!string.IsNullOrWhiteSpace(frontendBaseUrl))
+{
+    allowedOrigins = [.. allowedOrigins, frontendBaseUrl];
+}
+
+allowedOrigins = allowedOrigins
+    .Where(origin => !string.IsNullOrWhiteSpace(origin))
+    .Select(NormalizeOrigin)
+    .Distinct(StringComparer.OrdinalIgnoreCase)
+    .ToArray();
+
+if (allowedOrigins.Length == 0)
+{
+    throw new InvalidOperationException("Najmanje jedan CORS frontend origin mora biti konfigurisan.");
 }
 
 if (!builder.Environment.IsEnvironment("Testing"))
@@ -140,7 +169,7 @@ builder.Services.AddCors(options =>
 {
     options.AddPolicy("AllowFrontend", policy =>
     {
-        policy.WithOrigins("http://localhost:5173", "http://localhost:3001")
+        policy.WithOrigins(allowedOrigins)
             .AllowAnyHeader()
             .AllowAnyMethod();
     });
@@ -228,8 +257,38 @@ if (app.Environment.IsDevelopment())
     app.MapOpenApi();
 }
 
+app.MapGet("/health", async (LabSistemDbContext context, CancellationToken cancellationToken) =>
+{
+    try
+    {
+        return await context.Database.CanConnectAsync(cancellationToken)
+            ? Results.Ok(new { status = "healthy" })
+            : Results.Json(new { status = "unhealthy" }, statusCode: StatusCodes.Status503ServiceUnavailable);
+    }
+    catch
+    {
+        return Results.Json(new { status = "unhealthy" }, statusCode: StatusCodes.Status503ServiceUnavailable);
+    }
+}).AllowAnonymous();
+
 app.MapControllers();
 app.Run();
+
+static string NormalizeOrigin(string origin)
+{
+    var trimmedOrigin = origin.Trim().TrimEnd('/');
+    if (!Uri.TryCreate(trimmedOrigin, UriKind.Absolute, out var uri) ||
+        (uri.Scheme != Uri.UriSchemeHttp && uri.Scheme != Uri.UriSchemeHttps) ||
+        uri.AbsolutePath != "/" ||
+        !string.IsNullOrEmpty(uri.Query) ||
+        !string.IsNullOrEmpty(uri.Fragment) ||
+        !string.IsNullOrEmpty(uri.UserInfo))
+    {
+        throw new InvalidOperationException($"Neispravan CORS origin: {origin}");
+    }
+
+    return uri.GetLeftPart(UriPartial.Authority);
+}
 
 static void LoadDotEnvFile(string filePath)
 {
