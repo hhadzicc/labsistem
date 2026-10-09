@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import { Link, useLocation, useNavigate } from "react-router-dom";
-import { AlertCircle, Eye, EyeOff, GraduationCap, Info, Presentation, Wrench } from "lucide-react";
+import { AlertCircle, Eye, EyeOff, GraduationCap, Info, LoaderCircle, Presentation, RefreshCw, Wrench } from "lucide-react";
 import api, { getDemoStatus, loginAsDemo } from "../api/client";
 import {
   hasActiveAccessToken,
@@ -9,6 +9,11 @@ import {
 } from "../auth/session";
 
 function Login() {
+  const fallbackDemoAccounts = [
+    { role: "student", label: "Student" },
+    { role: "profesor", label: "Profesor" },
+    { role: "tehnicar", label: "Tehničar" },
+  ];
   const loginHeading = "Prijavite se sa svojim LABsistem korisničkim nalogom";
   const usernameLabel = "Korisničko ime ili email adresa:";
   const [usernameOrEmail, setUsernameOrEmail] = useState("");
@@ -18,9 +23,14 @@ function Login() {
   const [submitted, setSubmitted] = useState(false);
   const [touched, setTouched] = useState({ username: false, password: false });
   const [loading, setLoading] = useState(false);
+  const [loginIsSlow, setLoginIsSlow] = useState(false);
   const [demoAccounts, setDemoAccounts] = useState([]);
   const [demoResetMinutes, setDemoResetMinutes] = useState(60);
+  const [demoStatus, setDemoStatus] = useState("loading");
+  const [demoLoadAttempt, setDemoLoadAttempt] = useState(0);
+  const [demoWakeIsSlow, setDemoWakeIsSlow] = useState(false);
   const [loadingDemoRole, setLoadingDemoRole] = useState("");
+  const [demoLoginIsSlow, setDemoLoginIsSlow] = useState(false);
   const [demoError, setDemoError] = useState("");
   const navigate = useNavigate();
   const location = useLocation();
@@ -37,24 +47,45 @@ function Login() {
 
   useEffect(() => {
     let active = true;
+    setDemoStatus("loading");
+    setDemoWakeIsSlow(false);
+    setDemoError("");
 
-    getDemoStatus()
+    const slowTimer = window.setTimeout(() => {
+      if (active) {
+        setDemoWakeIsSlow(true);
+      }
+    }, 2500);
+
+    getDemoStatus({ timeout: 90000 })
       .then((response) => {
-        if (active && response.data?.enabled) {
-          setDemoAccounts(response.data.accounts || []);
+        if (!active) {
+          return;
+        }
+
+        if (response.data?.enabled) {
+          setDemoAccounts(response.data.accounts?.length ? response.data.accounts : fallbackDemoAccounts);
           setDemoResetMinutes(response.data.resetIntervalMinutes || 60);
+          setDemoStatus("ready");
+        } else {
+          setDemoStatus("disabled");
         }
       })
       .catch(() => {
         if (active) {
-          setDemoAccounts([]);
+          setDemoStatus("error");
+          setDemoError("Demo pristup se nije uspio povezati sa serverom.");
         }
+      })
+      .finally(() => {
+        window.clearTimeout(slowTimer);
       });
 
     return () => {
       active = false;
+      window.clearTimeout(slowTimer);
     };
-  }, []);
+  }, [demoLoadAttempt]);
 
   const completeLogin = (session, enteredIdentity = "") => {
     persistSession(session);
@@ -73,11 +104,20 @@ function Login() {
     }
 
     setLoading(true);
+    setLoginIsSlow(false);
+    const slowTimer = window.setTimeout(() => {
+      setLoginIsSlow(true);
+    }, 2500);
+
     try {
-      const response = await api.post("/Auth/login", {
-        username: usernameOrEmail.trim(),
-        password,
-      });
+      const response = await api.post(
+        "/Auth/login",
+        {
+          username: usernameOrEmail.trim(),
+          password,
+        },
+        { timeout: 90000 }
+      );
 
       completeLogin(response.data, usernameOrEmail);
     } catch (error) {
@@ -91,22 +131,36 @@ function Login() {
         backendMessage || "Prijava nije uspjela. Provjerite korisničko ime ili email adresu i lozinku."
       );
     } finally {
+      window.clearTimeout(slowTimer);
       setLoading(false);
+      setLoginIsSlow(false);
     }
   };
 
   const handleDemoLogin = async (role) => {
     setGreska("");
     setDemoError("");
+    setDemoLoginIsSlow(false);
     setLoadingDemoRole(role);
 
+    const slowTimer = window.setTimeout(() => {
+      setDemoLoginIsSlow(true);
+    }, 2500);
+
     try {
-      const response = await loginAsDemo(role);
+      const response = await loginAsDemo(role, { timeout: 90000 });
       completeLogin(response.data);
     } catch (error) {
-      setDemoError(error.response?.data?.message || "Demo prijava trenutno nije dostupna. Pokušajte ponovo.");
+      const timedOut = error.code === "ECONNABORTED";
+      setDemoError(
+        timedOut
+          ? "Pokretanje servera traje duže nego očekivano. Pokušajte ponovo."
+          : error.response?.data?.message || "Demo prijava trenutno nije dostupna. Pokušajte ponovo."
+      );
     } finally {
+      window.clearTimeout(slowTimer);
       setLoadingDemoRole("");
+      setDemoLoginIsSlow(false);
     }
   };
 
@@ -198,11 +252,11 @@ function Login() {
           </div>
 
           <button className="button" type="submit" style={{ width: "100%" }} disabled={loading}>
-            {loading ? "Prijava..." : "Prijavi se"}
+            {loading ? (loginIsSlow ? "Pokretanje servera..." : "Prijava...") : "Prijavi se"}
           </button>
         </form>
 
-        {demoAccounts.length > 0 && (
+        {demoStatus !== "disabled" && (
           <section className="demo-login" aria-labelledby="demo-login-title">
             <div className="demo-login-divider"><span>ili isprobajte aplikaciju</span></div>
             <div className="demo-login-heading">
@@ -218,7 +272,7 @@ function Login() {
               </span>
             </div>
             <div className="demo-role-grid">
-              {demoAccounts.map((account) => {
+              {(demoAccounts.length > 0 ? demoAccounts : fallbackDemoAccounts).map((account) => {
                 const Icon = demoIcons[account.role] || GraduationCap;
                 const isLoading = loadingDemoRole === account.role;
                 return (
@@ -226,19 +280,49 @@ function Login() {
                     key={account.role}
                     type="button"
                     className="demo-role-button"
-                    disabled={Boolean(loadingDemoRole) || loading}
+                    disabled={demoStatus !== "ready" || Boolean(loadingDemoRole) || loading}
                     onClick={() => handleDemoLogin(account.role)}
                   >
-                    <Icon size={18} aria-hidden="true" />
+                    {isLoading ? <LoaderCircle className="spin" size={18} aria-hidden="true" /> : <Icon size={18} aria-hidden="true" />}
                     <span>{isLoading ? "Otvaranje..." : account.label}</span>
                   </button>
                 );
               })}
             </div>
+            {demoStatus === "loading" && (
+              <div className="field-message info demo-connection-status" role="status" aria-live="polite">
+                <LoaderCircle className="spin" size={16} aria-hidden="true" />
+                <span>
+                  {demoWakeIsSlow
+                    ? "Server se pokreće. Prvi pristup može potrajati do minute."
+                    : "Povezivanje sa demo serverom..."}
+                </span>
+              </div>
+            )}
+            {loadingDemoRole && (
+              <div className="field-message info demo-connection-status" role="status" aria-live="polite">
+                <LoaderCircle className="spin" size={16} aria-hidden="true" />
+                <span>
+                  {demoLoginIsSlow
+                    ? "Server završava pokretanje. Demo prostor će se otvoriti čim bude spreman."
+                    : "Pripremamo demo radni prostor..."}
+                </span>
+              </div>
+            )}
             {demoError && (
-              <div className="field-message error" role="alert">
+              <div className="field-message error demo-connection-status" role="alert">
                 <AlertCircle size={16} aria-hidden="true" />
                 <span>{demoError}</span>
+                {demoStatus === "error" && (
+                  <button
+                    type="button"
+                    className="demo-retry-button"
+                    onClick={() => setDemoLoadAttempt((attempt) => attempt + 1)}
+                  >
+                    <RefreshCw size={14} aria-hidden="true" />
+                    Pokušaj ponovo
+                  </button>
+                )}
               </div>
             )}
           </section>
