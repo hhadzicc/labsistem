@@ -27,6 +27,13 @@ const CALENDAR_MESSAGES = {
   showMore: (count) => `+${count} vise`,
 };
 
+const CALENDAR_FORMATS = {
+  agendaDateFormat: "DD.MM.",
+  agendaTimeFormat: "HH:mm",
+  agendaTimeRangeFormat: ({ start, end }, culture, activeLocalizer) =>
+    `${activeLocalizer.format(start, "HH:mm", culture)}–${activeLocalizer.format(end, "HH:mm", culture)}`,
+};
+
 const STATUS_META = {
   available: {
     label: "Slobodan",
@@ -354,6 +361,7 @@ function Kalendar() {
                   titleAccessor="title"
                   style={{ height: "100%" }}
                   messages={CALENDAR_MESSAGES}
+                  formats={CALENDAR_FORMATS}
                   eventPropGetter={eventPropGetter}
                   view={view}
                   views={[Views.MONTH, Views.WEEK, Views.DAY, Views.AGENDA]}

@@ -208,9 +208,14 @@ function Login() {
             <div className="demo-login-heading">
               <div>
                 <h2 id="demo-login-title">Demo pristup</h2>
-                <p>Odaberite ulogu i otvorite pripremljen radni prostor.</p>
+                <p>Odaberite ulogu i istražite pripremljeni radni prostor.</p>
               </div>
-              <span className="demo-reset-note">Reset svakih {demoResetMinutes} min</span>
+              <span
+                className="demo-reset-note"
+                title={`Demo podaci se vraćaju na početno stanje približno svakih ${demoResetMinutes} minuta.`}
+              >
+                Periodični reset podataka
+              </span>
             </div>
             <div className="demo-role-grid">
               {demoAccounts.map((account) => {

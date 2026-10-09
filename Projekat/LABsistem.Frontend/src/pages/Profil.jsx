@@ -423,11 +423,11 @@ function Profil() {
             <p><strong>Email:</strong> {profil.email}</p>
             <p>
               <strong>Status emaila:</strong>{" "}
-              <span className={`badge ${emailVerified ? "zeleno" : "sivo"}`}>
-                {emailVerified ? "Verifikovan" : "Neverifikovan"}
+              <span className={`badge ${demoSession ? "plavo" : emailVerified ? "zeleno" : "sivo"}`}>
+                {demoSession ? "Demo adresa" : emailVerified ? "Verifikovan" : "Neverifikovan"}
               </span>
             </p>
-            {emailVerifiedAtLabel && (
+            {!demoSession && emailVerifiedAtLabel && (
               <p><strong>Verifikovan:</strong> {emailVerifiedAtLabel}</p>
             )}
             <p><strong>Uloga:</strong> {prikazanaUloga}</p>
@@ -442,7 +442,7 @@ function Profil() {
 
           {demoSession && (
             <div className="auth-status-note info" role="status">
-              Demo profil je samo za pregled. Podaci i lozinka automatski se vraćaju na početno stanje.
+              Demo profil je samo za pregled. Podaci se periodično vraćaju na početno stanje.
             </div>
           )}
 
@@ -454,15 +454,7 @@ function Profil() {
             </p>
           )}
 
-          <div
-            style={{
-              marginBottom: 20,
-              padding: 16,
-              borderRadius: 16,
-              border: `1px solid ${emailVerified ? "#bbf7d0" : "#fde68a"}`,
-              background: emailVerified ? "#f0fdf4" : "#fffbeb",
-            }}
-          >
+          <div className={`profile-email-status ${demoSession ? "is-demo" : emailVerified ? "is-verified" : "is-unverified"}`}>
             <div
               style={{
                 display: "flex",
@@ -473,17 +465,19 @@ function Profil() {
               }}
             >
               <div>
-                <p style={{ margin: 0, fontWeight: 700 }}>
-                  {emailVerified ? "Email verifikovan" : "Email nije verifikovan"}
+                <p className="profile-email-status-title">
+                  {demoSession ? "Demo email adresa" : emailVerified ? "Email verifikovan" : "Email nije verifikovan"}
                 </p>
-                <p style={{ margin: "8px 0 0", color: "#475569" }}>
-                  {emailVerified
+                <p className="profile-email-status-copy">
+                  {demoSession
+                    ? "Ova sistemska adresa služi samo za demonstraciju. Email poruke i oporavak lozinke nisu dostupni za demo nalog."
+                    : emailVerified
                     ? "Email notifikacije i oporavak lozinke putem emaila su dostupni za ovaj nalog."
                     : "Oporavak lozinke putem emaila i email notifikacije nisu dostupni dok ne verifikujete adresu."}
                 </p>
               </div>
 
-              {!emailVerified && (
+              {!demoSession && !emailVerified && (
                 <button
                   className="button sekundarno"
                   type="button"

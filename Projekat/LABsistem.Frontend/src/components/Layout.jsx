@@ -55,6 +55,7 @@ function Layout({ children }) {
 
   useEffect(() => {
     document.documentElement.setAttribute("data-theme", theme);
+    document.documentElement.style.colorScheme = theme;
     localStorage.setItem("theme", theme);
   }, [theme]);
 
@@ -210,29 +211,12 @@ function Layout({ children }) {
 
           <div className="topbar-tools">
             <button
+              type="button"
               onClick={toggleTheme}
               className="theme-toggle-btn"
               title={theme === "light" ? "Aktiviraj tamni režim" : "Aktiviraj svijetli režim"}
-              style={{
-                background: "none",
-                border: "none",
-                cursor: "pointer",
-                padding: "6px",
-                color: "var(--text-muted, #64748b)",
-                display: "flex",
-                alignItems: "center",
-                justifyContent: "center",
-                borderRadius: "50%",
-                transition: "background 0.2s, color 0.2s"
-              }}
-              onMouseEnter={(e) => {
-                e.currentTarget.style.background = "var(--hover-bg)";
-                e.currentTarget.style.color = "var(--text-primary)";
-              }}
-              onMouseLeave={(e) => {
-                e.currentTarget.style.background = "none";
-                e.currentTarget.style.color = "var(--text-muted)";
-              }}
+              aria-label={theme === "light" ? "Aktiviraj tamni režim" : "Aktiviraj svijetli režim"}
+              aria-pressed={theme === "dark"}
             >
               {theme === "light" ? <Moon size={20} aria-hidden="true" /> : <Sun size={20} aria-hidden="true" />}
             </button>
