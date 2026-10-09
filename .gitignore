@@ -13,6 +13,7 @@ obj/
 **/.vs/
 .idea/
 **/.idea/
+*.csproj.user
 
 # =========================
 # Environment files
@@ -24,6 +25,21 @@ obj/
 # Logs
 # =========================
 *.log
+
+# =========================
+# Test and coverage output
+# =========================
+**/TestResults/
+*.coverage
+coverage/
+
+# =========================
+# Node / frontend build output
+# =========================
+node_modules/
+dist/
+cypress/screenshots/
+cypress/videos/
 
 # =========================
 # Local tooling artifacts
