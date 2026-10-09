@@ -1,5 +1,7 @@
 using LABsistem.Api.Services;
 using LABsistem.Application.DTOs;
+using LABsistem.Domain;
+using LABsistem.Presentation.Services;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using System.Security.Claims;
@@ -14,21 +16,26 @@ namespace LABsistem.Presentation.Controllers
         private readonly IRezervacijaService _service;
         private readonly IObavijestService _obavijestService;
         private readonly IEmailNotificationService _emailNotificationService;
+        private readonly IDemoAccessGuard _demoAccessGuard;
 
         public RezervacijaController(
             IRezervacijaService service,
             IObavijestService obavijestService,
-            IEmailNotificationService emailNotificationService)
+            IEmailNotificationService emailNotificationService,
+            IDemoAccessGuard demoAccessGuard)
         {
             _service = service;
             _obavijestService = obavijestService;
             _emailNotificationService = emailNotificationService;
+            _demoAccessGuard = demoAccessGuard;
         }
 
         [HttpPost("rezervisi/{id}")]
         [Authorize(Roles = "Profesor")]
         public async Task<IActionResult> Rezervisi(int id, [FromBody] RezervacijaCreateDTO dto)
         {
+            if (IsDemoUser() && !await _demoAccessGuard.IsDemoTermAsync(id)) return Forbid();
+
             var userId = User.FindFirstValue(ClaimTypes.NameIdentifier);
             if (string.IsNullOrEmpty(userId)) return Unauthorized();
             var profesorId = int.Parse(userId);
@@ -47,6 +54,8 @@ namespace LABsistem.Presentation.Controllers
         [Authorize(Roles = "Profesor,Student")]
         public async Task<IActionResult> Otkazi(int id)
         {
+            if (IsDemoUser() && !await _demoAccessGuard.IsDemoTermAsync(id)) return Forbid();
+
             var userId = User.FindFirstValue(ClaimTypes.NameIdentifier);
             if (string.IsNullOrEmpty(userId)) return Unauthorized();
             if (!int.TryParse(userId, out var korisnikId)) return Unauthorized();
@@ -85,6 +94,8 @@ namespace LABsistem.Presentation.Controllers
         [Authorize(Roles = "Student")]
         public async Task<IActionResult> PosaljiZahtjev(int id)
         {
+            if (IsDemoUser() && !await _demoAccessGuard.IsDemoTermAsync(id)) return Forbid();
+
             var userId = User.FindFirstValue(ClaimTypes.NameIdentifier);
             if (string.IsNullOrEmpty(userId)) return Unauthorized();
             var studentId = int.Parse(userId);
@@ -103,6 +114,8 @@ namespace LABsistem.Presentation.Controllers
         [Authorize(Roles = "Student")]
         public async Task<IActionResult> OtkaziZahtjev(int zahtjevId)
         {
+            if (IsDemoUser() && !await _demoAccessGuard.IsDemoRequestAsync(zahtjevId)) return Forbid();
+
             var userId = User.FindFirstValue(ClaimTypes.NameIdentifier);
             if (string.IsNullOrEmpty(userId)) return Unauthorized();
             if (!int.TryParse(userId, out var studentId)) return Unauthorized();
@@ -122,6 +135,8 @@ namespace LABsistem.Presentation.Controllers
         [Authorize(Roles = "Profesor")]
         public async Task<IActionResult> OdgovoriNaZahtjev(int zahtjevId, [FromQuery] bool odobri, [FromQuery] string? komentar = null)
         {
+            if (IsDemoUser() && !await _demoAccessGuard.IsDemoRequestAsync(zahtjevId)) return Forbid();
+
             var userId = User.FindFirstValue(ClaimTypes.NameIdentifier);
             if (string.IsNullOrEmpty(userId)) return Unauthorized();
             var profesorId = int.Parse(userId);
@@ -162,8 +177,11 @@ namespace LABsistem.Presentation.Controllers
         [Authorize(Roles = "Profesor")]
         public async Task<IActionResult> GetSlobodni()
         {
-            var termini = await _service.GetSlobodniTerminiAsync();
-            return Ok(termini);
+            var terms = (await _service.GetSlobodniTerminiAsync()).ToList();
+            if (!IsDemoUser()) return Ok(terms);
+
+            var allowedIds = await _demoAccessGuard.GetDemoTermIdsAsync(terms.Select(item => item.ID));
+            return Ok(terms.Where(item => allowedIds.Contains(item.ID)));
         }
 
         [HttpGet("moje")]
@@ -196,8 +214,11 @@ namespace LABsistem.Presentation.Controllers
             var userId = User.FindFirstValue(ClaimTypes.NameIdentifier);
             if (string.IsNullOrEmpty(userId)) return Unauthorized();
             var studentId = int.Parse(userId);
-            var termini = await _service.GetDostupniTerminiZaStudenteAsync(studentId);
-            return Ok(termini);
+            var terms = (await _service.GetDostupniTerminiZaStudenteAsync(studentId)).ToList();
+            if (!IsDemoUser()) return Ok(terms);
+
+            var allowedIds = await _demoAccessGuard.GetDemoTermIdsAsync(terms.Select(item => item.ID));
+            return Ok(terms.Where(item => allowedIds.Contains(item.ID)));
         }
 
         [HttpGet("moji-zahtjevi")]
@@ -211,5 +232,8 @@ namespace LABsistem.Presentation.Controllers
             var zahtjevi = await _service.GetMojeZahtjeveAsync(studentId);
             return Ok(zahtjevi);
         }
+
+        private bool IsDemoUser() =>
+            DemoAccounts.IsDemoUsername(User.FindFirstValue(ClaimTypes.Name));
     }
 }

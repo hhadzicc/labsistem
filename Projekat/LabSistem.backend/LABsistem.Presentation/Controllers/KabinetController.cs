@@ -1,7 +1,10 @@
 using LABsistem.Api.Services;
 using LABsistem.Application.DTOs;
+using LABsistem.Domain;
+using LABsistem.Presentation.Services;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
+using System.Security.Claims;
 
 namespace LABsistem.Presentation.Controllers
 {
@@ -10,15 +13,23 @@ namespace LABsistem.Presentation.Controllers
     public class KabinetController : ControllerBase
     {
         private readonly IKabinetService _service;
+        private readonly IDemoAccessGuard _demoAccessGuard;
 
-        public KabinetController(IKabinetService service) => _service = service;
+        public KabinetController(IKabinetService service, IDemoAccessGuard demoAccessGuard)
+        {
+            _service = service;
+            _demoAccessGuard = demoAccessGuard;
+        }
 
         [HttpGet]
         [Authorize(Roles = "Admin,Profesor,Tehnicar")]
         public async Task<IActionResult> Get()
         {
-            var kabineti = await _service.VratiSveKabinete();
-            return Ok(kabineti);
+            var cabinets = (await _service.VratiSveKabinete()).ToList();
+            if (!IsDemoUser()) return Ok(cabinets);
+
+            var allowedIds = await _demoAccessGuard.GetDemoCabinetIdsAsync(cabinets.Select(item => item.ID));
+            return Ok(cabinets.Where(item => allowedIds.Contains(item.ID)));
         }
 
         [HttpPost]
@@ -49,11 +60,16 @@ namespace LABsistem.Presentation.Controllers
         [Authorize(Roles = "Admin,Profesor,Tehnicar")]
         public async Task<IActionResult> GetById(int id)
         {
+            if (IsDemoUser() && !await _demoAccessGuard.IsDemoCabinetAsync(id)) return Forbid();
+
             var kabinet = await _service.VratiKabinetPoId(id);
             if (kabinet == null)
                 return NotFound(new { message = "Kabinet nije pronađen" });
             
             return Ok(kabinet);
         }
+
+        private bool IsDemoUser() =>
+            DemoAccounts.IsDemoUsername(User.FindFirstValue(ClaimTypes.Name));
     }
 }

@@ -151,4 +151,12 @@ export function resetPassword(token, newPassword, confirmPassword) {
   });
 }
 
+export function getDemoStatus() {
+  return authApi.get("/Auth/demo/status");
+}
+
+export function loginAsDemo(role) {
+  return authApi.post(`/Auth/demo/login/${encodeURIComponent(role)}`);
+}
+
 export default api;

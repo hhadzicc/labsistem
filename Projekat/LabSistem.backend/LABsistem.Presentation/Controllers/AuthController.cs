@@ -2,9 +2,12 @@ using System.IdentityModel.Tokens.Jwt;
 using System.Security.Claims;
 using LABsistem.Application.DTOs.Auth;
 using LABsistem.Application.Services;
+using LABsistem.Domain;
 using LABsistem.Domain.Enums;
+using LABsistem.Presentation.Configuration;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.Extensions.Options;
 
 namespace LABsistem.Presentation.Controllers
 {
@@ -38,6 +41,64 @@ namespace LABsistem.Presentation.Controllers
                         ? "Pogresni kredencijali."
                         : loginResult.FailureMessage
                 });
+            }
+
+            return Ok(loginResult.Session);
+        }
+
+        [HttpGet("demo/status")]
+        [AllowAnonymous]
+        public IActionResult GetDemoStatus([FromServices] IOptions<DemoModeOptions> options)
+        {
+            var demoOptions = options.Value;
+            var accounts = demoOptions.Enabled
+                ? DemoAccounts.All.Select(account => new
+                {
+                    Role = account.RoleKey,
+                    account.Label
+                }).ToArray()
+                : [];
+
+            return Ok(new
+            {
+                demoOptions.Enabled,
+                ResetIntervalMinutes = Math.Max(15, demoOptions.ResetIntervalMinutes),
+                Accounts = accounts
+            });
+        }
+
+        [HttpPost("demo/login/{role}")]
+        [AllowAnonymous]
+        public async Task<IActionResult> DemoLogin(
+            string role,
+            [FromServices] IOptions<DemoModeOptions> options)
+        {
+            var demoOptions = options.Value;
+            if (!demoOptions.Enabled)
+            {
+                return NotFound(new { Message = "Demo pristup trenutno nije uključen." });
+            }
+
+            var account = DemoAccounts.FindByRole(role);
+            if (account is null)
+            {
+                return BadRequest(new { Message = "Odabrana demo uloga nije podržana." });
+            }
+
+            var loginResult = await _authService.LoginAsync(
+                new LoginRequestDto
+                {
+                    Username = account.Username,
+                    Password = demoOptions.Password
+                },
+                HttpContext.Connection.RemoteIpAddress?.ToString(),
+                Request.Headers.UserAgent.ToString());
+
+            if (loginResult.Session is null)
+            {
+                return StatusCode(
+                    StatusCodes.Status503ServiceUnavailable,
+                    new { Message = "Demo nalog trenutno nije dostupan. Pokušajte ponovo za nekoliko trenutaka." });
             }
 
             return Ok(loginResult.Session);

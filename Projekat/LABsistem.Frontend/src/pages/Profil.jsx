@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from "react";
 import Layout from "../components/Layout";
 import api, { resendVerificationEmail } from "../api/client";
+import { isDemoSession } from "../auth/session";
 
 const FULL_NAME_MIN_LENGTH = 2;
 const FULL_NAME_MAX_LENGTH = 100;
@@ -174,6 +175,7 @@ function formatVerificationTimestamp(value) {
 }
 
 function Profil() {
+  const demoSession = isDemoSession();
   const [profil, setProfil] = useState(null);
   const [osnovniPodaci, setOsnovniPodaci] = useState({
     imePrezime: "",
@@ -438,6 +440,12 @@ function Profil() {
         <div className="card profil-main-card">
           <h2 style={{ fontSize: 16, marginBottom: 20 }}>Osnovni podaci</h2>
 
+          {demoSession && (
+            <div className="auth-status-note info" role="status">
+              Demo profil je samo za pregled. Podaci i lozinka automatski se vraćaju na početno stanje.
+            </div>
+          )}
+
           {uspjeh && <p className="form-success">{uspjeh}</p>}
           {greska && <p className="form-error">{greska}</p>}
           {verificationMessage.text && (
@@ -498,6 +506,7 @@ function Profil() {
                 name="imePrezime"
                 type="text"
                 value={osnovniPodaci.imePrezime}
+                disabled={demoSession}
                 onChange={handleOsnovniPodaciChange}
                 onBlur={handleProfileBlur}
                 minLength={FULL_NAME_MIN_LENGTH}
@@ -516,6 +525,7 @@ function Profil() {
                 name="email"
                 type="email"
                 value={osnovniPodaci.email}
+                disabled={demoSession}
                 onChange={handleOsnovniPodaciChange}
                 onBlur={handleProfileBlur}
                 minLength={EMAIL_MIN_LENGTH}
@@ -534,6 +544,7 @@ function Profil() {
                 name="username"
                 type="text"
                 value={osnovniPodaci.username}
+                disabled={demoSession}
                 onChange={handleOsnovniPodaciChange}
                 onBlur={handleProfileBlur}
                 inputMode="text"
@@ -559,13 +570,14 @@ function Profil() {
             </div>
 
             <div className="profil-actions">
-              <button className="button" type="submit" disabled={savingProfile || profileFormInvalid}>
+              <button className="button" type="submit" disabled={demoSession || savingProfile || profileFormInvalid}>
                 {savingProfile ? "Čuvanje..." : "Sačuvaj"}
               </button>
               <button
                 className="button sekundarno"
                 type="button"
                 onClick={() => setShowPasswordModal(true)}
+                disabled={demoSession}
               >
                 Promijeni lozinku
               </button>

@@ -5,6 +5,7 @@ using System.Security.Claims;
 using LABsistem.Dal.Db;
 using Microsoft.EntityFrameworkCore;
 using LABsistem.Application.DTOs;
+using LABsistem.Domain;
 
 namespace LABsistem.Presentation.Controllers
 {
@@ -44,6 +45,8 @@ namespace LABsistem.Presentation.Controllers
         [Authorize(Roles = "Admin,Tehnicar")]
         public async Task<IActionResult> KreirajOpcu([FromBody] OpcaObavijestCreateDTO dto)
         {
+            if (DemoAccounts.IsDemoUsername(User.FindFirstValue(ClaimTypes.Name))) return Forbid();
+
             try
             {
                 var brojKorisnika = await _service.KreirajZaSveAktivneKorisnikeAsync(dto.Poruka);

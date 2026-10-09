@@ -8,6 +8,7 @@ using LABsistem.Api.Services;
 using LABsistem.Application.DTOs.Auth;
 using LABsistem.Application.Models;
 using LABsistem.Dal.Db;
+using LABsistem.Domain;
 using LABsistem.Domain.Entities;
 using LABsistem.Domain.Enums;
 using Microsoft.EntityFrameworkCore;
@@ -208,7 +209,8 @@ namespace LABsistem.Application.Services
                 UserId = existingRefreshToken.Korisnik.ID,
                 Username = existingRefreshToken.Korisnik.Username,
                 Role = existingRefreshToken.Korisnik.Uloga.ToString(),
-                MustChangePassword = existingRefreshToken.Korisnik.MustChangePassword
+                MustChangePassword = existingRefreshToken.Korisnik.MustChangePassword,
+                IsDemo = DemoAccounts.IsDemoUsername(existingRefreshToken.Korisnik.Username)
             };
         }
 
@@ -335,6 +337,17 @@ namespace LABsistem.Application.Services
                 return (false, "Korisnik nije pronadjen.", null);
             }
 
+            if (DemoAccounts.IsDemoUsername(korisnik.Username))
+            {
+                return (false, "Demo profil se automatski vraća na početno stanje i ne može se mijenjati.", null);
+            }
+
+            if (IsProtectedAdmin(korisnik) &&
+                !string.Equals(korisnik.Email, request.Email.Trim(), StringComparison.OrdinalIgnoreCase))
+            {
+                return (false, "Email zaštićenog administratora ne može se mijenjati kroz aplikaciju.", null);
+            }
+
             var validationMessage = _businessRules.ValidateProfileFields(request.ImePrezime, request.Email, request.Username);
             if (validationMessage is not null)
             {
@@ -404,6 +417,17 @@ namespace LABsistem.Application.Services
             if (korisnik is null)
             {
                 return (false, "Korisnik nije pronadjen.", null);
+            }
+
+            if (IsProtectedAdmin(korisnik))
+            {
+                return (false, "Zaštićeni administratorski nalog nije moguće uređivati kroz ovaj panel.", null);
+            }
+
+            if (korisnik.Uloga == UlogaKorisnika.Admin && request.Uloga != UlogaKorisnika.Admin &&
+                await IsLastActiveAdminAsync(korisnik.ID))
+            {
+                return (false, "Posljednjem aktivnom administratoru nije moguće promijeniti ulogu.", null);
             }
 
             var validationMessage = _businessRules.ValidateProfileFields(request.ImePrezime, request.Email, request.Username);
@@ -505,9 +529,19 @@ namespace LABsistem.Application.Services
                 return (false, "Korisnik nije pronadjen.", null);
             }
 
+            if (IsProtectedAdmin(korisnik))
+            {
+                return (false, "Zaštićeni administratorski nalog nije moguće deaktivirati.", null);
+            }
+
             if (korisnik.DeactivatedAt.HasValue)
             {
                 return (false, "Korisnik je već deaktiviran.", null);
+            }
+
+            if (korisnik.Uloga == UlogaKorisnika.Admin && await IsLastActiveAdminAsync(korisnik.ID))
+            {
+                return (false, "Posljednjeg aktivnog administratora nije moguće deaktivirati.", null);
             }
 
             korisnik.DeactivatedAt = DateTime.UtcNow;
@@ -525,6 +559,11 @@ namespace LABsistem.Application.Services
             if (korisnik is null)
             {
                 return (false, "Korisnik nije pronadjen.");
+            }
+
+            if (DemoAccounts.IsDemoUsername(korisnik.Username))
+            {
+                return (false, "Lozinka demo naloga se ne može mijenjati.");
             }
 
             if (string.IsNullOrWhiteSpace(request.NewPassword) ||
@@ -584,6 +623,11 @@ namespace LABsistem.Application.Services
                 .FirstOrDefaultAsync(x => x.Email == normalizedEmail, cancellationToken);
 
             if (korisnik is null || korisnik.DeactivatedAt.HasValue || !korisnik.EmailVerified)
+            {
+                return (true, ForgotPasswordGenericMessage);
+            }
+
+            if (DemoAccounts.IsDemoUsername(korisnik.Username))
             {
                 return (true, ForgotPasswordGenericMessage);
             }
@@ -858,8 +902,24 @@ namespace LABsistem.Application.Services
                 UserId = korisnik.ID,
                 Username = korisnik.Username,
                 Role = korisnik.Uloga.ToString(),
-                MustChangePassword = korisnik.MustChangePassword
+                MustChangePassword = korisnik.MustChangePassword,
+                IsDemo = DemoAccounts.IsDemoUsername(korisnik.Username)
             };
+        }
+
+        private bool IsProtectedAdmin(Korisnik korisnik)
+        {
+            var protectedAdminEmail = _configuration["DemoMode:ProtectedAdminEmail"]?.Trim();
+            return !string.IsNullOrWhiteSpace(protectedAdminEmail) &&
+                   string.Equals(korisnik.Email, protectedAdminEmail, StringComparison.OrdinalIgnoreCase);
+        }
+
+        private async Task<bool> IsLastActiveAdminAsync(int userId)
+        {
+            return !await _dbContext.Korisnici.AnyAsync(user =>
+                user.ID != userId &&
+                user.Uloga == UlogaKorisnika.Admin &&
+                user.DeactivatedAt == null);
         }
 
         private void RevokeUserRefreshTokens(IEnumerable<RefreshToken> refreshTokens)

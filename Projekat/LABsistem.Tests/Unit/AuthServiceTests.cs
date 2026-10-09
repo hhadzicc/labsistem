@@ -110,7 +110,7 @@ public class AuthServiceTests
         return new LabSistemDbContext(options);
     }
 
-    private AuthService CreateService(LabSistemDbContext context)
+    private AuthService CreateService(LabSistemDbContext context, IConfiguration? configuration = null)
     {
         var businessRules = new AuthBusinessRules(context);
         return new AuthService(
@@ -120,7 +120,7 @@ public class AuthServiceTests
             businessRules,
             _emailNotificationServiceMock.Object,
             _obavijestServiceMock.Object,
-            _configuration,
+            configuration ?? _configuration,
             _loggerMock.Object);
     }
 
@@ -476,6 +476,58 @@ public class AuthServiceTests
 
         Assert.False(result.Success);
         Assert.Equal("Ne možete uređivati vlastiti nalog kroz ovaj panel.", result.Message);
+    }
+
+    [Fact]
+    public async Task UpdateAndDeactivateUserAsync_WithProtectedAdmin_AreRejected()
+    {
+        using var context = GetInMemoryDbContext();
+        var operatorAdmin = BuildUser("OperatorAdmin", "operator@test.com", BCrypt.Net.BCrypt.HashPassword("Valid123!"), UlogaKorisnika.Admin);
+        var ownerAdmin = BuildUser("OwnerAdmin", "owner@test.com", BCrypt.Net.BCrypt.HashPassword("Valid123!"), UlogaKorisnika.Admin);
+        context.Korisnici.AddRange(operatorAdmin, ownerAdmin);
+        await context.SaveChangesAsync();
+
+        var configuration = new ConfigurationBuilder()
+            .AddInMemoryCollection(new Dictionary<string, string?>
+            {
+                ["FrontendBaseUrl"] = "http://localhost:3001",
+                ["DemoMode:ProtectedAdminEmail"] = ownerAdmin.Email
+            })
+            .Build();
+        var service = CreateService(context, configuration);
+
+        var updateResult = await service.UpdateUserAsync(operatorAdmin.ID, ownerAdmin.ID, new UpdateManagedUserRequestDto
+        {
+            ImePrezime = "Changed Owner",
+            Email = "changed.owner@test.com",
+            Username = "ChangedOwner",
+            Uloga = UlogaKorisnika.Student
+        });
+        var deactivateResult = await service.DeactivateUserAsync(operatorAdmin.ID, ownerAdmin.ID);
+
+        Assert.False(updateResult.Success);
+        Assert.False(deactivateResult.Success);
+        Assert.Contains("Zaštićeni", updateResult.Message);
+        Assert.Contains("Zaštićeni", deactivateResult.Message);
+        Assert.Equal(UlogaKorisnika.Admin, ownerAdmin.Uloga);
+        Assert.Null(ownerAdmin.DeactivatedAt);
+    }
+
+    [Fact]
+    public async Task DeactivateUserAsync_WithLastActiveAdmin_IsRejected()
+    {
+        using var context = GetInMemoryDbContext();
+        var operatorUser = BuildUser("OperatorUser", "operator@test.com", BCrypt.Net.BCrypt.HashPassword("Valid123!"));
+        var lastAdmin = BuildUser("LastAdmin", "last.admin@test.com", BCrypt.Net.BCrypt.HashPassword("Valid123!"), UlogaKorisnika.Admin);
+        context.Korisnici.AddRange(operatorUser, lastAdmin);
+        await context.SaveChangesAsync();
+
+        var service = CreateService(context);
+        var result = await service.DeactivateUserAsync(operatorUser.ID, lastAdmin.ID);
+
+        Assert.False(result.Success);
+        Assert.Contains("Posljednjeg aktivnog administratora", result.Message);
+        Assert.Null(lastAdmin.DeactivatedAt);
     }
 
     [Fact]

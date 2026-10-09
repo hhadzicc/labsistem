@@ -28,6 +28,10 @@ services:
       RESEND_API_KEY: ${RESEND_API_KEY}
       FROM_EMAIL: ${FROM_EMAIL}
       SeedData__DemoUsers: ${SEED_DEMO_USERS:-false}
+      DemoMode__Enabled: ${DEMO_MODE_ENABLED:-false}
+      DemoMode__ResetIntervalMinutes: ${DEMO_MODE_RESET_INTERVAL_MINUTES:-60}
+      DemoMode__ProtectedAdminEmail: ${DEMO_MODE_PROTECTED_ADMIN_EMAIL:-}
+      DemoMode__Password: ${DEMO_MODE_PASSWORD:-}
       BootstrapAdmin__Enabled: ${BOOTSTRAP_ADMIN_ENABLED:-false}
       BootstrapAdmin__Name: ${BOOTSTRAP_ADMIN_NAME:-}
       BootstrapAdmin__Email: ${BOOTSTRAP_ADMIN_EMAIL:-}

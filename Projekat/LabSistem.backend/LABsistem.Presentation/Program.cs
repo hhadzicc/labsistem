@@ -16,6 +16,7 @@ using Microsoft.IdentityModel.Tokens;
 using LABsistem.Api.Validators;
 using LABsistem.Presentation.BackgroundServices;
 using LABsistem.Presentation.Configuration;
+using LABsistem.Presentation.Services;
 using Microsoft.AspNetCore.Authorization;
 
 var builder = WebApplication.CreateBuilder(args);
@@ -74,11 +75,21 @@ if (!builder.Environment.IsEnvironment("Testing"))
 builder.Services.AddMemoryCache();
 builder.Services.Configure<ReservationReminderOptions>(
     builder.Configuration.GetSection(ReservationReminderOptions.SectionName));
+builder.Services
+    .AddOptions<DemoModeOptions>()
+    .Bind(builder.Configuration.GetSection(DemoModeOptions.SectionName))
+    .Validate(
+        options => !options.Enabled ||
+            (!string.IsNullOrWhiteSpace(options.ProtectedAdminEmail) &&
+             options.Password.Length >= 12),
+        "Kada je DemoMode uključen, ProtectedAdminEmail i Password od najmanje 12 znakova su obavezni.")
+    .ValidateOnStart();
 builder.Services.AddSingleton(jwtSettings);
 builder.Services.AddScoped<IJwtService, JwtService>();
 builder.Services.AddScoped<IRevokedTokenStore, DatabaseRevokedTokenStore>();
 builder.Services.AddScoped<AuthBusinessRules>();
 builder.Services.AddScoped<IAuthService, AuthService>();
+builder.Services.AddScoped<IDemoAccessGuard, DemoAccessGuard>();
 builder.Services.AddScoped<IOpremaRepository, OpremaRepository>();
 builder.Services.AddScoped<IOpremaService, OpremaService>();
 builder.Services.AddScoped<IEvidencijaRepository, EvidencijaRepository>();
@@ -98,6 +109,7 @@ builder.Services.AddScoped<IOpremaService, OpremaService>();
 builder.Services.AddScoped<IObavijestService, ObavijestService>();
 builder.Services.AddHttpClient<IEmailNotificationService, ResendEmailNotificationService>();
 builder.Services.AddHostedService<ReservationReminderBackgroundService>();
+builder.Services.AddHostedService<DemoDataBackgroundService>();
 
 builder.Services
     .AddAuthentication(JwtBearerDefaults.AuthenticationScheme)

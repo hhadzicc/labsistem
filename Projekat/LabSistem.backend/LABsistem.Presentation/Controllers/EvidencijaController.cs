@@ -1,5 +1,7 @@
 using LABsistem.Api.Services;
 using LABsistem.Application.DTOs;
+using LABsistem.Domain;
+using LABsistem.Presentation.Services;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using System.Security.Claims;
@@ -11,15 +13,23 @@ namespace LABsistem.Presentation.Controllers
     public class EvidencijaController : ControllerBase
     {
         private readonly IEvidencijaService _service;
+        private readonly IDemoAccessGuard _demoAccessGuard;
 
-        public EvidencijaController(IEvidencijaService service) => _service = service;
+        public EvidencijaController(IEvidencijaService service, IDemoAccessGuard demoAccessGuard)
+        {
+            _service = service;
+            _demoAccessGuard = demoAccessGuard;
+        }
 
         [HttpGet]
         [Authorize(Roles = "Admin,Tehnicar")]
         public async Task<IActionResult> Get()
         {
-            var evidencije = await _service.VratiSveEvidencije();
-            return Ok(evidencije);
+            var records = (await _service.VratiSveEvidencije()).ToList();
+            if (!IsDemoUser()) return Ok(records);
+
+            var allowedIds = await _demoAccessGuard.GetDemoEvidenceIdsAsync(records.Select(item => item.ID));
+            return Ok(records.Where(item => allowedIds.Contains(item.ID)));
         }
 
         [HttpPost]
@@ -33,6 +43,15 @@ namespace LABsistem.Presentation.Controllers
                 {
                     return Unauthorized();
                 }
+
+                if (IsDemoUser() &&
+                    (!await _demoAccessGuard.IsDemoEquipmentAsync(dto.OpremaID) ||
+                     (dto.TerminID.HasValue && !await _demoAccessGuard.IsDemoTermAsync(dto.TerminID.Value))))
+                {
+                    return Forbid();
+                }
+
+                if (IsDemoUser()) dto.KorisnikID = parsedUserId;
 
                 await _service.KreirajEvidenciju(dto, parsedUserId);
                 return Ok(new { message = "Kvar uspjesno prijavljen" });
@@ -59,6 +78,8 @@ namespace LABsistem.Presentation.Controllers
                     return Unauthorized();
                 }
 
+                if (IsDemoUser() && !await _demoAccessGuard.IsDemoEvidenceAsync(id)) return Forbid();
+
                 await _service.AzurirajStatus(id, dto, parsedUserId);
                 return Ok(new { message = "Status azuriran" });
             }
@@ -76,8 +97,13 @@ namespace LABsistem.Presentation.Controllers
         [Authorize(Roles = "Admin,Tehnicar")]
         public async Task<IActionResult> Delete(int id)
         {
+            if (IsDemoUser() && !await _demoAccessGuard.IsDemoEvidenceAsync(id)) return Forbid();
+
             await _service.ObrisiEvidenciju(id);
             return Ok(new { message = "Evidencija obrisana" });
         }
+
+        private bool IsDemoUser() =>
+            DemoAccounts.IsDemoUsername(User.FindFirstValue(ClaimTypes.Name));
     }
 }

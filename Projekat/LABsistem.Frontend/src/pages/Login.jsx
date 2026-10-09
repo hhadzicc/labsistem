@@ -1,7 +1,7 @@
 import { useEffect, useState } from "react";
 import { Link, useLocation, useNavigate } from "react-router-dom";
-import { AlertCircle, Eye, EyeOff, Info } from "lucide-react";
-import api from "../api/client";
+import { AlertCircle, Eye, EyeOff, GraduationCap, Info, Presentation, Wrench } from "lucide-react";
+import api, { getDemoStatus, loginAsDemo } from "../api/client";
 import {
   hasActiveAccessToken,
   isPasswordChangeRequired,
@@ -18,6 +18,10 @@ function Login() {
   const [submitted, setSubmitted] = useState(false);
   const [touched, setTouched] = useState({ username: false, password: false });
   const [loading, setLoading] = useState(false);
+  const [demoAccounts, setDemoAccounts] = useState([]);
+  const [demoResetMinutes, setDemoResetMinutes] = useState(60);
+  const [loadingDemoRole, setLoadingDemoRole] = useState("");
+  const [demoError, setDemoError] = useState("");
   const navigate = useNavigate();
   const location = useLocation();
 
@@ -30,6 +34,34 @@ function Login() {
       navigate(isPasswordChangeRequired() ? "/first-login-password" : "/dashboard");
     }
   }, [navigate]);
+
+  useEffect(() => {
+    let active = true;
+
+    getDemoStatus()
+      .then((response) => {
+        if (active && response.data?.enabled) {
+          setDemoAccounts(response.data.accounts || []);
+          setDemoResetMinutes(response.data.resetIntervalMinutes || 60);
+        }
+      })
+      .catch(() => {
+        if (active) {
+          setDemoAccounts([]);
+        }
+      });
+
+    return () => {
+      active = false;
+    };
+  }, []);
+
+  const completeLogin = (session, enteredIdentity = "") => {
+    persistSession(session);
+    localStorage.setItem("korisnikEmail", enteredIdentity.includes("@") ? enteredIdentity : "");
+    localStorage.setItem("korisnik", session.username);
+    navigate(session?.mustChangePassword ? "/first-login-password" : "/dashboard");
+  };
 
   const handleSubmit = async (event) => {
     event.preventDefault();
@@ -47,12 +79,7 @@ function Login() {
         password,
       });
 
-      const { username: authenticatedUsername } = response.data;
-      persistSession(response.data);
-      localStorage.setItem("korisnikEmail", usernameOrEmail.includes("@") ? usernameOrEmail : "");
-      localStorage.setItem("korisnik", authenticatedUsername);
-
-      navigate(response.data?.mustChangePassword ? "/first-login-password" : "/dashboard");
+      completeLogin(response.data, usernameOrEmail);
     } catch (error) {
       const responseData = error.response?.data;
       const backendMessage =
@@ -66,6 +93,27 @@ function Login() {
     } finally {
       setLoading(false);
     }
+  };
+
+  const handleDemoLogin = async (role) => {
+    setGreska("");
+    setDemoError("");
+    setLoadingDemoRole(role);
+
+    try {
+      const response = await loginAsDemo(role);
+      completeLogin(response.data);
+    } catch (error) {
+      setDemoError(error.response?.data?.message || "Demo prijava trenutno nije dostupna. Pokušajte ponovo.");
+    } finally {
+      setLoadingDemoRole("");
+    }
+  };
+
+  const demoIcons = {
+    student: GraduationCap,
+    profesor: Presentation,
+    tehnicar: Wrench,
   };
 
   return (
@@ -153,6 +201,43 @@ function Login() {
             {loading ? "Prijava..." : "Prijavi se"}
           </button>
         </form>
+
+        {demoAccounts.length > 0 && (
+          <section className="demo-login" aria-labelledby="demo-login-title">
+            <div className="demo-login-divider"><span>ili isprobajte aplikaciju</span></div>
+            <div className="demo-login-heading">
+              <div>
+                <h2 id="demo-login-title">Demo pristup</h2>
+                <p>Odaberite ulogu i otvorite pripremljen radni prostor.</p>
+              </div>
+              <span className="demo-reset-note">Reset svakih {demoResetMinutes} min</span>
+            </div>
+            <div className="demo-role-grid">
+              {demoAccounts.map((account) => {
+                const Icon = demoIcons[account.role] || GraduationCap;
+                const isLoading = loadingDemoRole === account.role;
+                return (
+                  <button
+                    key={account.role}
+                    type="button"
+                    className="demo-role-button"
+                    disabled={Boolean(loadingDemoRole) || loading}
+                    onClick={() => handleDemoLogin(account.role)}
+                  >
+                    <Icon size={18} aria-hidden="true" />
+                    <span>{isLoading ? "Otvaranje..." : account.label}</span>
+                  </button>
+                );
+              })}
+            </div>
+            {demoError && (
+              <div className="field-message error" role="alert">
+                <AlertCircle size={16} aria-hidden="true" />
+                <span>{demoError}</span>
+              </div>
+            )}
+          </section>
+        )}
       </div>
     </main>
   );
