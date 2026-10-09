@@ -230,23 +230,23 @@ function Rezervacije() {
               <div className="users-list">
                 {filtrirane.map((termin) => (
                   <div className="termini-list-row users-list-item" key={termin.id}>
-                    <span style={{ fontWeight: 700 }}>
+                    <span data-label="Datum" style={{ fontWeight: 700 }}>
                       {new Date(termin.datum).toLocaleDateString("de-DE")}
                     </span>
-                    <span>
+                    <span data-label="Vrijeme">
                       <span className="badge plavo">
                         {termin.vrijemePocetka.slice(0, 5)} - {termin.vrijemeKraja.slice(0, 5)}
                       </span>
                     </span>
-                    <span>{termin.kabinetNaziv}</span>
-                    {uloga === "student" && <span>{termin.profesorIme}</span>}
-                    <span>
+                    <span data-label="Kabinet">{termin.kabinetNaziv}</span>
+                    {uloga === "student" && <span data-label="Profesor">{termin.profesorIme}</span>}
+                    <span data-label="Status">
                       <span className={`badge ${termin.statusTermina === "Slobodan" ? "sivo" : "zeleno"}`}>
                         {termin.statusTermina}
                       </span>
                     </span>
                     {(uloga === "profesor" || uloga === "student") && (
-                      <span>
+                      <span data-label="Akcija">
                         <button className="button warn" onClick={() => otkaziRezervaciju(termin.id)}>
                           Otkaži
                         </button>
@@ -278,22 +278,22 @@ function Rezervacije() {
               <div className="users-list">
                 {zahtjevi.map((zahtjev) => (
                   <div className="termini-list-row users-list-item" key={zahtjev.id}>
-                    <span style={{ fontWeight: 700 }}>
+                    <span data-label="Datum" style={{ fontWeight: 700 }}>
                       {new Date(zahtjev.datum).toLocaleDateString("de-DE")}
                     </span>
-                    <span>
+                    <span data-label="Vrijeme">
                       <span className="badge plavo">
                         {zahtjev.vrijemePocetka.slice(0, 5)} - {zahtjev.vrijemeKraja.slice(0, 5)}
                       </span>
                     </span>
-                    <span>{zahtjev.kabinetNaziv}</span>
-                    <span>{zahtjev.profesorIme}</span>
-                    <span>
+                    <span data-label="Kabinet">{zahtjev.kabinetNaziv}</span>
+                    <span data-label="Profesor">{zahtjev.profesorIme}</span>
+                    <span data-label="Status zahtjeva">
                       <span className={`badge ${klasaStatusaZahtjeva(zahtjev.statusZahtjeva)}`}>
                         {labelaStatusaZahtjeva(zahtjev.statusZahtjeva)}
                       </span>
                     </span>
-                    <span>
+                    <span data-label="Akcija">
                       {zahtjev.mozeOtkazati ? (
                         <button className="button warn" onClick={() => otkaziZahtjev(zahtjev.id)}>
                           Poništi zahtjev

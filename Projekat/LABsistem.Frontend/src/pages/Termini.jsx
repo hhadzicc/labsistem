@@ -67,9 +67,13 @@ function Termini() {
   const [editingTermin, setEditingTermin] = useState(null);
   const [saving, setSaving] = useState(false);
   const [formState, setFormState] = useState(INITIAL_FORM_STATE);
+  const [formErrors, setFormErrors] = useState({});
+  const [touched, setTouched] = useState({});
+  const [submitted, setSubmitted] = useState(false);
   const [message, setMessage] = useState({ type: "", text: "" });
   const [rezervacijaModalOpen, setRezervacijaModalOpen] = useState(false);
   const [rezervacijaForm, setRezervacijaForm] = useState({ limitOsoba: 20, vidljivoStudentima: true });
+  const [rezervacijaSubmitted, setRezervacijaSubmitted] = useState(false);
   const [selectedTerminId, setSelectedTerminId] = useState(null);
   const [equipmentModalOpen, setEquipmentModalOpen] = useState(false);
   const [selectedCabinetEquipment, setSelectedCabinetEquipment] = useState([]);
@@ -179,14 +183,23 @@ function Termini() {
 
   function handleFormChange(e) {
     const { name, value } = e.target;
-    setFormState((prev) => ({ ...prev, [name]: value }));
+    const next = { ...formState, [name]: value };
+    setFormState(next);
+    setFormErrors(validateForm(next));
+    setMessage({ type: "", text: "" });
   }
 
   function openCreateModal() {
     setModalMode("create");
     setEditingTermin(null);
     setFormState(INITIAL_FORM_STATE);
+    setFormErrors({});
+    setTouched({});
+    setSubmitted(false);
     setMessage({ type: "", text: "" });
+    setFormErrors({});
+    setTouched({});
+    setSubmitted(false);
     setModalOpen(true);
   }
 
@@ -203,42 +216,34 @@ function Termini() {
     setModalOpen(true);
   }
 
-  function validateForm() {
-    if (
-      !formState.datum ||
-      !formState.vrijemePocetka ||
-      !formState.vrijemeKraja ||
-      !formState.kabinetID
-    ) {
-      return "Sva polja su obavezna.";
+  function validateForm(values = formState) {
+    const errors = {};
+    if (!values.datum) errors.datum = "Odaberite datum termina.";
+    if (!values.vrijemePocetka) errors.vrijemePocetka = "Odaberite vrijeme početka.";
+    if (!values.vrijemeKraja) errors.vrijemeKraja = "Odaberite vrijeme kraja.";
+    if (!values.kabinetID) errors.kabinetID = "Odaberite kabinet.";
+    if (values.vrijemePocetka && values.vrijemeKraja && values.vrijemeKraja <= values.vrijemePocetka) {
+      errors.vrijemeKraja = "Vrijeme kraja mora biti nakon vremena početka.";
     }
-
-    if (formState.vrijemeKraja <= formState.vrijemePocetka) {
-      return "Vrijeme kraja mora biti nakon vremena pocetka.";
-    }
-
-    if (isPastTermin(formState)) {
-      return "Termin ne moze biti u proslosti.";
-    }
-
-    if (!currentUserId) {
-      return "Nije pronadjen prijavljeni korisnik.";
-    }
-
-    return "";
+    if (isPastTermin(values)) errors.vrijemePocetka = "Termin ne može biti u prošlosti.";
+    return errors;
   }
 
   async function handleSubmit(e) {
     e.preventDefault();
-    setSaving(true);
+    setSubmitted(true);
     setMessage({ type: "", text: "" });
 
-    const validationError = validateForm();
-    if (validationError) {
-      setMessage({ type: "error", text: validationError });
-      setSaving(false);
+    const errors = validateForm();
+    setFormErrors(errors);
+    if (Object.keys(errors).length > 0) {
       return;
     }
+    if (!currentUserId) {
+      setMessage({ type: "error", text: "Nije pronađen prijavljeni korisnik." });
+      return;
+    }
+    setSaving(true);
 
     const payload = {
       datum: `${formState.datum}T00:00:00.000Z`,
@@ -290,7 +295,7 @@ function Termini() {
 
   async function handleRezervisi(e) {
     e.preventDefault();
-    setSaving(true);
+    setRezervacijaSubmitted(true);
     setMessage({ type: "", text: "" });
 
     if (!rezervacijaForm.maxKapacitet || rezervacijaForm.maxKapacitet < 1) {
@@ -313,6 +318,8 @@ function Termini() {
       setSaving(false);
       return;
     }
+
+    setSaving(true);
 
     try {
       await api.post(`/Rezervacija/rezervisi/${selectedTerminId}`, rezervacijaForm);
@@ -344,6 +351,7 @@ function Termini() {
       vidljivoStudentima: true,
       maxKapacitet: kabinet.kapacitet
     });
+    setRezervacijaSubmitted(false);
     setRezervacijaModalOpen(true);
   }
 
@@ -500,7 +508,7 @@ function Termini() {
             </p>
           )}
 
-          <div className="termini-list-header termini-list-row">
+          <div className="termini-list-header termini-list-row termini-grid-6">
             <span>Datum</span>
             <span>Vrijeme</span>
             <span>Kabinet</span>
@@ -515,19 +523,19 @@ function Termini() {
             <div className="users-list">
               {sortedTermini.map((termin) => (
                 <div
-                  className="termini-list-row users-list-item"
+                  className="termini-list-row users-list-item termini-grid-6"
                   key={termin.id}
                 >
-                  <span style={{ fontWeight: 700 }}>
+                  <span data-label="Datum" style={{ fontWeight: 700 }}>
                     {formatDateForDisplay(termin.datum)}
                   </span>
-                  <span>
+                  <span data-label="Vrijeme">
                     <span className="badge plavo">
                       {formatTimeForInput(termin.vrijemePocetka)} -{" "}
                       {formatTimeForInput(termin.vrijemeKraja)}
                     </span>
                   </span>
-                  <span>
+                  <span data-label="Kabinet">
                     <button 
                       className="text-button" 
                       onClick={() => loadEquipment(termin.kabinetID, termin.kabinetNaziv)}
@@ -536,16 +544,16 @@ function Termini() {
                       {termin.kabinetNaziv || `Kabinet #${termin.kabinetID}`}
                     </button>
                   </span>
-                  <span>
+                  <span data-label="Kreator">
                     {termin.kreatorIme || `Korisnik #${termin.kreatorID}`}
                   </span>
-                  <span>
+                  <span data-label="Status">
                     <span className={`badge ${termin.statusTermina === "Slobodan" ? "zeleno" : "plavo"}`}>
                       {termin.statusTermina}
                     </span>
                   </span>
                   {(canManageTermini || (currentRole === "profesor" && termin.statusTermina === "Slobodan")) && (
-                    <span>
+                    <span data-label="Akcije">
                       <div className="users-actions">
                         {canManageTermini && (
                           <>
@@ -629,47 +637,66 @@ function Termini() {
               </p>
             )}
 
-            <form onSubmit={handleSubmit}>
+            <form onSubmit={handleSubmit} noValidate>
               <div className="form-group">
-                <label>Datum</label>
+                <label htmlFor="termin-datum">Datum</label>
                 <input
+                  id="termin-datum"
                   name="datum"
                   type="date"
                   value={formState.datum}
                   onChange={handleFormChange}
-                  required
+                  onBlur={() => setTouched(prev => ({ ...prev, datum: true }))}
+                  className={(submitted || touched.datum) && formErrors.datum ? "input-error" : ""}
+                  aria-invalid={Boolean((submitted || touched.datum) && formErrors.datum)}
+                  aria-describedby="termin-datum-error"
                 />
+                {(submitted || touched.datum) && formErrors.datum && <p className="field-error" id="termin-datum-error">{formErrors.datum}</p>}
               </div>
 
               <div className="form-group">
-                <label>Vrijeme pocetka</label>
+                <label htmlFor="termin-pocetak">Vrijeme početka</label>
                 <input
+                  id="termin-pocetak"
                   name="vrijemePocetka"
                   type="time"
                   value={formState.vrijemePocetka}
                   onChange={handleFormChange}
-                  required
+                  onBlur={() => setTouched(prev => ({ ...prev, vrijemePocetka: true }))}
+                  className={(submitted || touched.vrijemePocetka) && formErrors.vrijemePocetka ? "input-error" : ""}
+                  aria-invalid={Boolean((submitted || touched.vrijemePocetka) && formErrors.vrijemePocetka)}
+                  aria-describedby="termin-pocetak-error"
                 />
+                {(submitted || touched.vrijemePocetka) && formErrors.vrijemePocetka && <p className="field-error" id="termin-pocetak-error">{formErrors.vrijemePocetka}</p>}
               </div>
 
               <div className="form-group">
-                <label>Vrijeme kraja</label>
+                <label htmlFor="termin-kraj">Vrijeme kraja</label>
                 <input
+                  id="termin-kraj"
                   name="vrijemeKraja"
                   type="time"
                   value={formState.vrijemeKraja}
                   onChange={handleFormChange}
-                  required
+                  onBlur={() => setTouched(prev => ({ ...prev, vrijemeKraja: true }))}
+                  className={(submitted || touched.vrijemeKraja) && formErrors.vrijemeKraja ? "input-error" : ""}
+                  aria-invalid={Boolean((submitted || touched.vrijemeKraja) && formErrors.vrijemeKraja)}
+                  aria-describedby="termin-kraj-error"
                 />
+                {(submitted || touched.vrijemeKraja) && formErrors.vrijemeKraja && <p className="field-error" id="termin-kraj-error">{formErrors.vrijemeKraja}</p>}
               </div>
 
               <div className="form-group">
-                <label>Kabinet</label>
+                <label htmlFor="termin-kabinet">Kabinet</label>
                 <select
+                  id="termin-kabinet"
                   name="kabinetID"
                   value={formState.kabinetID}
                   onChange={handleFormChange}
-                  required
+                  onBlur={() => setTouched(prev => ({ ...prev, kabinetID: true }))}
+                  className={(submitted || touched.kabinetID) && formErrors.kabinetID ? "input-error" : ""}
+                  aria-invalid={Boolean((submitted || touched.kabinetID) && formErrors.kabinetID)}
+                  aria-describedby="termin-kabinet-error"
                 >
                   <option value="">Odaberi kabinet</option>
                   {kabinetOptions.map((kabinet) => (
@@ -681,6 +708,7 @@ function Termini() {
                     </option>
                   ))}
                 </select>
+                {(submitted || touched.kabinetID) && formErrors.kabinetID && <p className="field-error" id="termin-kabinet-error">{formErrors.kabinetID}</p>}
               </div>
 
               <div className="users-modal-actions">
@@ -707,20 +735,23 @@ function Termini() {
               <h2>Rezervacija termina</h2>
               <button className="users-modal-close" onClick={() => setRezervacijaModalOpen(false)}>x</button>
             </div>
-            <form onSubmit={handleRezervisi}>
+            <form onSubmit={handleRezervisi} noValidate>
               <div className="form-group">
-                <label>Limit osoba (Maksimalno: {rezervacijaForm.maxKapacitet})</label>
+                <label htmlFor="rezervacija-limit">Limit osoba (maksimalno: {rezervacijaForm.maxKapacitet})</label>
                 <input
+                  id="rezervacija-limit"
                   type="number"
                   value={rezervacijaForm.limitOsoba}
                   onChange={(e) => setRezervacijaForm({ ...rezervacijaForm, limitOsoba: Number(e.target.value) })}
                   min="1"
                   max={rezervacijaForm.maxKapacitet}
-                  required
+                  className={rezervacijaSubmitted && (rezervacijaForm.limitOsoba < 1 || rezervacijaForm.limitOsoba > rezervacijaForm.maxKapacitet) ? "input-error" : ""}
+                  aria-invalid={Boolean(rezervacijaSubmitted && (rezervacijaForm.limitOsoba < 1 || rezervacijaForm.limitOsoba > rezervacijaForm.maxKapacitet))}
+                  aria-describedby="rezervacija-limit-error"
                 />
-                {rezervacijaForm.limitOsoba > rezervacijaForm.maxKapacitet && (
-                  <p className="form-error" style={{ fontSize: "12px", marginTop: "4px" }}>
-                    Limit ne može biti veći od kapaciteta kabineta ({rezervacijaForm.maxKapacitet}).
+                {rezervacijaSubmitted && (rezervacijaForm.limitOsoba < 1 || rezervacijaForm.limitOsoba > rezervacijaForm.maxKapacitet) && (
+                  <p className="field-error" id="rezervacija-limit-error">
+                    Unesite broj između 1 i {rezervacijaForm.maxKapacitet}.
                   </p>
                 )}
               </div>

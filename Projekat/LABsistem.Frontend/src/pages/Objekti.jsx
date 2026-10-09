@@ -14,7 +14,7 @@ function extractError(error, fallback) {
   return fallback;
 }
 
-function ProfAutocomplete({ korisnici, value, onChange, initialDisplayName = "" }) {
+function ProfAutocomplete({ korisnici, value, onChange, initialDisplayName = "", invalid = false, describedBy }) {
   const [inputVal, setInputVal] = useState("");
   const [open, setOpen] = useState(false);
   const ref = useRef(null);
@@ -52,7 +52,9 @@ function ProfAutocomplete({ korisnici, value, onChange, initialDisplayName = "" 
         onFocus={() => setOpen(true)}
         placeholder="Ime i prezime profesora..."
         autoComplete="off"
-        required
+        className={invalid ? "input-error" : ""}
+        aria-invalid={invalid}
+        aria-describedby={describedBy}
         style={{ width: "100%", boxSizing: "border-box" }}
       />
       {open && filtered.length > 0 && (
@@ -99,6 +101,9 @@ export default function Objekti() {
   const [form, setForm] = useState({});
   const [saving, setSaving] = useState(false);
   const [formMsg, setFormMsg] = useState({ type: "", text: "" });
+  const [formErrors, setFormErrors] = useState({});
+  const [touched, setTouched] = useState({});
+  const [submitted, setSubmitted] = useState(false);
   
   // Story 1: state za detalje kabineta
   const [selectedKabinet, setSelectedKabinet] = useState(null);
@@ -151,18 +156,48 @@ export default function Objekti() {
     else if (type === "kabinet-create") setForm({ ...INIT_KABINET, objekatID: data.objekatID });
     else if (type === "kabinet-edit") setForm({ naziv: data.naziv, korisnikID: data.korisnikID, objekatID: data.objekatID, kapacitet: data.kapacitet });
     setFormMsg({ type: "", text: "" });
+    setFormErrors({});
+    setTouched({});
+    setSubmitted(false);
   }
 
-  function closeModal() { setModal(null); setForm({}); }
+  function closeModal() { setModal(null); setForm({}); setFormErrors({}); setTouched({}); setSubmitted(false); }
+
+  function validateForm(values = form) {
+    const errors = {};
+    if (modal?.type?.startsWith("objekat")) {
+      if (!values.lokacija?.trim()) errors.lokacija = "Unesite lokaciju objekta.";
+      if (!values.radnoVrijeme?.trim()) {
+        errors.radnoVrijeme = "Unesite radno vrijeme.";
+      } else if (!/^([01]\d|2[0-3]):[0-5]\d\s*-\s*([01]\d|2[0-3]):[0-5]\d$/.test(values.radnoVrijeme.trim())) {
+        errors.radnoVrijeme = "Koristite format 08:00 - 20:00.";
+      }
+    } else {
+      if (!values.naziv?.trim()) errors.naziv = "Unesite naziv kabineta.";
+      if (!values.korisnikID) errors.korisnikID = "Odaberite odgovornog profesora.";
+      if (!Number.isInteger(Number(values.kapacitet)) || Number(values.kapacitet) < 1) {
+        errors.kapacitet = "Kapacitet mora biti cijeli broj veći od nule.";
+      }
+    }
+    return errors;
+  }
 
   function handleChange(e) {
     const { name, value } = e.target;
     const numericFields = ["korisnikID", "kapacitet"];
-    setForm(prev => ({ ...prev, [name]: numericFields.includes(name) ? Number(value) : value }));
+    const nextValue = numericFields.includes(name) ? (value === "" ? "" : Number(value)) : value;
+    const nextForm = { ...form, [name]: nextValue };
+    setForm(nextForm);
+    setFormErrors(validateForm(nextForm));
+    setFormMsg({ type: "", text: "" });
   }
 
   async function handleSubmit(e) {
     e.preventDefault();
+    setSubmitted(true);
+    const errors = validateForm();
+    setFormErrors(errors);
+    if (Object.keys(errors).length > 0) return;
     setSaving(true);
     setFormMsg({ type: "", text: "" });
     try {
@@ -233,7 +268,7 @@ export default function Objekti() {
               <span className="users-create-icon">+</span> Dodaj objekat
             </button>
           )}
-          <div style={{ position: "relative", flex: 1, minWidth: "200px" }}>
+          <div className="objects-search">
             <span style={{ position: "absolute", left: "10px", top: "50%", transform: "translateY(-50%)", color: "var(--text-muted)", pointerEvents: "none" }}>🔍</span>
             <input
               type="text"
@@ -258,21 +293,22 @@ export default function Objekti() {
             <div className="users-empty-state">Nema pronađenih objekata.</div>
           ) : (
             filtered.map(objekat => (
-              <div key={objekat.id} style={{ borderBottom: "1px solid var(--border)", padding: "12px 0" }}>
-                <div style={{ display: "flex", alignItems: "center", gap: "12px", padding: "4px 8px" }}>
+              <div key={objekat.id} className="object-list-item">
+                <div className="object-list-summary">
                   <button
                     onClick={() => toggleExpand(objekat.id)}
-                    style={{ background: "none", border: "none", cursor: "pointer", fontSize: "18px", color: "var(--text-muted)", width: "28px" }}
+                    className="object-expand-button"
+                    aria-label={expanded[objekat.id] ? "Sakrij kabinete" : "Prikaži kabinete"}
                   >
                     {expanded[objekat.id] ? "▾" : "▸"}
                   </button>
-                  <div style={{ flex: 1 }}>
-                    <span style={{ fontWeight: "700", fontSize: "16px" }}>{objekat.lokacija}</span>
-                    <span style={{ marginLeft: "12px", color: "var(--text-muted)", fontSize: "13px" }}>🕐 {objekat.radnoVrijeme}</span>
-                    <span style={{ marginLeft: "12px", color: "var(--text-muted)", fontSize: "13px" }}>📦 {objekat.kabineti?.length || 0} kabineta</span>
+                  <div className="object-meta">
+                    <strong>{objekat.lokacija}</strong>
+                    <span>🕐 {objekat.radnoVrijeme}</span>
+                    <span>📦 {objekat.kabineti?.length || 0} kabineta</span>
                   </div>
                   {isAdmin && (
-                    <div className="users-actions">
+                    <div className="users-actions object-actions">
                       <button className="users-action-btn" onClick={() => openModal("objekat-edit", objekat)}>✎ Uredi</button>
                       <button className="users-action-btn" onClick={() => openModal("kabinet-create", { objekatID: objekat.id })}>+ Kabinet</button>
                       <button className="users-action-btn warn" onClick={() => deleteObjekat(objekat.id)}>🗑 Briši</button>
@@ -281,12 +317,12 @@ export default function Objekti() {
                 </div>
 
                 {expanded[objekat.id] && (
-                  <div style={{ marginLeft: "48px", marginTop: "8px" }}>
+                  <div className="cabinet-list">
                     {!objekat.kabineti?.length ? (
                       <div style={{ color: "var(--text-muted)", fontSize: "13px", padding: "6px 0" }}>Nema kabineta u ovom objektu.</div>
                     ) : (
                       <>
-                        <div className="users-list-header users-list-row" style={{ fontSize: "12px" }}>
+                        <div className="users-list-header users-list-row cabinet-list-row" style={{ fontSize: "12px" }}>
                           <span>Naziv</span>
                           <span>Odgovorni profesor</span>
                           <span>Kapacitet</span>
@@ -294,16 +330,16 @@ export default function Objekti() {
                         </div>
                         {objekat.kabineti.map(k => (
                           <div 
-                            className="users-list-row users-list-item" 
+                            className="users-list-row users-list-item cabinet-list-row"
                             key={k.id}
                             style={{ cursor: "pointer" }}
                             onClick={() => openKabinetDetails(k)}
                           >
-                            <span style={{ fontWeight: "600" }}>{k.naziv}</span>
-                            <span>{k.odgovorniKorisnik}</span>
-                            <span>{k.kapacitet}</span>
+                            <span data-label="Naziv" style={{ fontWeight: "600" }}>{k.naziv}</span>
+                            <span data-label="Odgovorni profesor">{k.odgovorniKorisnik}</span>
+                            <span data-label="Kapacitet">{k.kapacitet}</span>
                             {isAdmin && (
-                              <span onClick={e => e.stopPropagation()}>
+                              <span data-label="Akcije" onClick={e => e.stopPropagation()}>
                                 <div className="users-actions">
                                   <button className="users-action-btn" onClick={() => openModal("kabinet-edit", k)}>✎ Uredi</button>
                                   <button className="users-action-btn warn" onClick={() => deleteKabinet(k.id)}>🗑 Briši</button>
@@ -365,36 +401,48 @@ export default function Objekti() {
             {formMsg.text && (
               <p className={formMsg.type === "error" ? "form-error" : "form-success"}>{formMsg.text}</p>
             )}
-            <form onSubmit={handleSubmit}>
+            <form onSubmit={handleSubmit} noValidate>
               {!isKabinetModal ? (
                 <>
                   <div className="form-group">
-                    <label>Lokacija</label>
-                    <input name="lokacija" value={form.lokacija || ""} onChange={handleChange} required maxLength={20} />
+                    <label htmlFor="objekat-lokacija">Lokacija</label>
+                    <input id="objekat-lokacija" name="lokacija" value={form.lokacija || ""} onChange={handleChange} onBlur={() => setTouched(prev => ({ ...prev, lokacija: true }))} className={(submitted || touched.lokacija) && formErrors.lokacija ? "input-error" : ""} aria-invalid={Boolean((submitted || touched.lokacija) && formErrors.lokacija)} aria-describedby="objekat-lokacija-error" maxLength={20} />
+                    {(submitted || touched.lokacija) && formErrors.lokacija && <p className="field-error" id="objekat-lokacija-error">{formErrors.lokacija}</p>}
                   </div>
                   <div className="form-group">
-                    <label>Radno vrijeme</label>
-                    <input name="radnoVrijeme" value={form.radnoVrijeme || ""} onChange={handleChange} required maxLength={20} placeholder="npr. 08:00 - 20:00" />
+                    <label htmlFor="objekat-radno-vrijeme">Radno vrijeme</label>
+                    <input id="objekat-radno-vrijeme" name="radnoVrijeme" value={form.radnoVrijeme || ""} onChange={handleChange} onBlur={() => setTouched(prev => ({ ...prev, radnoVrijeme: true }))} className={(submitted || touched.radnoVrijeme) && formErrors.radnoVrijeme ? "input-error" : ""} aria-invalid={Boolean((submitted || touched.radnoVrijeme) && formErrors.radnoVrijeme)} aria-describedby="objekat-radno-vrijeme-error" maxLength={20} placeholder="npr. 08:00 - 20:00" />
+                    {(submitted || touched.radnoVrijeme) && formErrors.radnoVrijeme && <p className="field-error" id="objekat-radno-vrijeme-error">{formErrors.radnoVrijeme}</p>}
                   </div>
                 </>
               ) : (
                 <>
                   <div className="form-group">
-                    <label>Naziv kabineta</label>
-                    <input name="naziv" value={form.naziv || ""} onChange={handleChange} required />
+                    <label htmlFor="kabinet-naziv">Naziv kabineta</label>
+                    <input id="kabinet-naziv" name="naziv" value={form.naziv || ""} onChange={handleChange} onBlur={() => setTouched(prev => ({ ...prev, naziv: true }))} className={(submitted || touched.naziv) && formErrors.naziv ? "input-error" : ""} aria-invalid={Boolean((submitted || touched.naziv) && formErrors.naziv)} aria-describedby="kabinet-naziv-error" />
+                    {(submitted || touched.naziv) && formErrors.naziv && <p className="field-error" id="kabinet-naziv-error">{formErrors.naziv}</p>}
                   </div>
                   <div className="form-group">
                     <label>Odgovorni profesor</label>
                     <ProfAutocomplete
                       korisnici={korisnici}
                       value={form.korisnikID}
-                      onChange={val => setForm(prev => ({ ...prev, korisnikID: val }))}
+                      onChange={val => {
+                        const nextForm = { ...form, korisnikID: val };
+                        setForm(nextForm);
+                        setTouched(prev => ({ ...prev, korisnikID: true }));
+                        setFormErrors(validateForm(nextForm));
+                      }}
                       initialDisplayName={modal?.data?.odgovorniKorisnik || ""}
+                      invalid={Boolean((submitted || touched.korisnikID) && formErrors.korisnikID)}
+                      describedBy="kabinet-profesor-error"
                     />
+                    {(submitted || touched.korisnikID) && formErrors.korisnikID && <p className="field-error" id="kabinet-profesor-error">{formErrors.korisnikID}</p>}
                   </div>
                   <div className="form-group">
-                    <label>Kapacitet</label>
-                    <input type="number" name="kapacitet" value={form.kapacitet || ""} onChange={handleChange} required min="1" />
+                    <label htmlFor="kabinet-kapacitet">Kapacitet</label>
+                    <input id="kabinet-kapacitet" type="number" name="kapacitet" value={form.kapacitet || ""} onChange={handleChange} onBlur={() => setTouched(prev => ({ ...prev, kapacitet: true }))} className={(submitted || touched.kapacitet) && formErrors.kapacitet ? "input-error" : ""} aria-invalid={Boolean((submitted || touched.kapacitet) && formErrors.kapacitet)} aria-describedby="kabinet-kapacitet-error" min="1" step="1" />
+                    {(submitted || touched.kapacitet) && formErrors.kapacitet && <p className="field-error" id="kabinet-kapacitet-error">{formErrors.kapacitet}</p>}
                   </div>
                 </>
               )}

@@ -1,49 +1,12 @@
 import { useEffect, useState } from "react";
 import { Link, useLocation, useNavigate } from "react-router-dom";
+import { AlertCircle, Eye, EyeOff, Info } from "lucide-react";
 import api from "../api/client";
 import {
   hasActiveAccessToken,
   isPasswordChangeRequired,
   persistSession,
 } from "../auth/session";
-
-function PasswordVisibilityIcon({ visible }) {
-  if (visible) {
-    return (
-      <svg
-        aria-hidden="true"
-        viewBox="0 0 24 24"
-        className="password-toggle-icon"
-        fill="none"
-        stroke="currentColor"
-        strokeWidth="2"
-        strokeLinecap="round"
-        strokeLinejoin="round"
-      >
-        <path d="M2 12s3.5-7 10-7 10 7 10 7-3.5 7-10 7-10-7-10-7Z" />
-        <circle cx="12" cy="12" r="3" />
-      </svg>
-    );
-  }
-
-  return (
-    <svg
-      aria-hidden="true"
-      viewBox="0 0 24 24"
-      className="password-toggle-icon"
-      fill="none"
-      stroke="currentColor"
-      strokeWidth="2"
-      strokeLinecap="round"
-      strokeLinejoin="round"
-    >
-      <path d="m3 3 18 18" />
-      <path d="M10.6 10.7A3 3 0 0 0 9 12a3 3 0 0 0 4.3 2.7" />
-      <path d="M9.4 5.2A10.8 10.8 0 0 1 12 5c6.5 0 10 7 10 7a17.7 17.7 0 0 1-3 3.8" />
-      <path d="M6.7 6.7C4.2 8.3 2.7 11 2 12c0 0 3.5 7 10 7 1.6 0 3-.4 4.3-1" />
-    </svg>
-  );
-}
 
 function Login() {
   const loginHeading = "Prijavite se sa svojim LABsistem korisničkim nalogom";
@@ -52,10 +15,15 @@ function Login() {
   const [password, setPassword] = useState("");
   const [showPassword, setShowPassword] = useState(false);
   const [greska, setGreska] = useState("");
+  const [submitted, setSubmitted] = useState(false);
+  const [touched, setTouched] = useState({ username: false, password: false });
+  const [loading, setLoading] = useState(false);
   const navigate = useNavigate();
   const location = useLocation();
 
   const sesijaIstekla = new URLSearchParams(location.search).get("sesija") === "istekla";
+  const usernameError = usernameOrEmail.trim() ? "" : "Unesite korisničko ime ili email adresu.";
+  const passwordError = password ? "" : "Unesite lozinku.";
 
   useEffect(() => {
     if (hasActiveAccessToken()) {
@@ -65,16 +33,17 @@ function Login() {
 
   const handleSubmit = async (event) => {
     event.preventDefault();
+    setSubmitted(true);
     setGreska("");
 
-    if (!usernameOrEmail || !password) {
-      setGreska("Unesite korisničko ime ili email adresu i lozinku.");
+    if (usernameError || passwordError) {
       return;
     }
 
+    setLoading(true);
     try {
       const response = await api.post("/Auth/login", {
-        username: usernameOrEmail,
+        username: usernameOrEmail.trim(),
         password,
       });
 
@@ -94,6 +63,8 @@ function Login() {
       setGreska(
         backendMessage || "Prijava nije uspjela. Provjerite korisničko ime ili email adresu i lozinku."
       );
+    } finally {
+      setLoading(false);
     }
   };
 
@@ -104,15 +75,10 @@ function Login() {
         <h1 className="login-title">{loginHeading}</h1>
 
         {sesijaIstekla && (
-          <p style={{ color: "#dc2626", marginBottom: 16, fontSize: 14 }}>
-            Sesija je istekla. Prijavite se ponovo.
-          </p>
-        )}
-
-        {greska && (
-          <p style={{ color: "#dc2626", marginBottom: 16, fontSize: 14 }}>
-            {greska}
-          </p>
+          <div className="auth-status-note info" role="status">
+            <Info size={17} aria-hidden="true" />
+            <span>Sesija je istekla. Prijavite se ponovo.</span>
+          </div>
         )}
 
         <form onSubmit={handleSubmit} noValidate>
@@ -123,8 +89,19 @@ function Login() {
               type="text"
               placeholder="Unesite korisničko ime ili email adresu"
               value={usernameOrEmail}
-              onChange={(event) => setUsernameOrEmail(event.target.value)}
+              autoComplete="username"
+              className={(touched.username || submitted) && usernameError ? "input-error" : ""}
+              aria-invalid={Boolean((touched.username || submitted) && usernameError)}
+              aria-describedby={(touched.username || submitted) && usernameError ? "login-username-error" : undefined}
+              onBlur={() => setTouched((current) => ({ ...current, username: true }))}
+              onChange={(event) => {
+                setUsernameOrEmail(event.target.value);
+                setGreska("");
+              }}
             />
+            {(touched.username || submitted) && usernameError && (
+              <p className="field-error" id="login-username-error">{usernameError}</p>
+            )}
           </div>
 
           <div className="form-group">
@@ -135,7 +112,15 @@ function Login() {
                 type={showPassword ? "text" : "password"}
                 placeholder="********"
                 value={password}
-                onChange={(event) => setPassword(event.target.value)}
+                autoComplete="current-password"
+                className={(touched.password || submitted || greska) && (passwordError || greska) ? "input-error" : ""}
+                aria-invalid={Boolean((touched.password || submitted || greska) && (passwordError || greska))}
+                aria-describedby={passwordError ? "login-password-error" : greska ? "login-credentials-error" : undefined}
+                onBlur={() => setTouched((current) => ({ ...current, password: true }))}
+                onChange={(event) => {
+                  setPassword(event.target.value);
+                  setGreska("");
+                }}
               />
               <button
                 type="button"
@@ -144,9 +129,18 @@ function Login() {
                 aria-pressed={showPassword}
                 onClick={() => setShowPassword((current) => !current)}
               >
-                <PasswordVisibilityIcon visible={showPassword} />
+                {showPassword ? <Eye size={20} aria-hidden="true" /> : <EyeOff size={20} aria-hidden="true" />}
               </button>
             </div>
+            {(touched.password || submitted) && passwordError && (
+              <p className="field-error" id="login-password-error">{passwordError}</p>
+            )}
+            {!passwordError && greska && (
+              <div className="field-message error" id="login-credentials-error" role="alert">
+                <AlertCircle size={16} aria-hidden="true" />
+                <span>{greska}</span>
+              </div>
+            )}
           </div>
 
           <div className="auth-link-row">
@@ -155,8 +149,8 @@ function Login() {
             </Link>
           </div>
 
-          <button className="button" type="submit" style={{ width: "100%" }}>
-            Prijavi se
+          <button className="button" type="submit" style={{ width: "100%" }} disabled={loading}>
+            {loading ? "Prijava..." : "Prijavi se"}
           </button>
         </form>
       </div>

@@ -107,7 +107,7 @@ function Zakazivanje() {
           </p>
         )}
 
-        <div className="termini-list-header termini-list-row">
+        <div className="termini-list-header termini-list-row termini-grid-7">
           <span>Datum</span>
           <span>Vrijeme</span>
           <span>Kabinet</span>
@@ -124,14 +124,14 @@ function Zakazivanje() {
             {termini
               .filter(t => t.statusPrijave !== "Odobren") // Ako je odobren, on je u "Moje rezervacije"
               .map((t) => (
-                <div className="termini-list-row users-list-item" key={t.id}>
-                  <span style={{ fontWeight: 700 }}>{new Date(t.datum).toLocaleDateString("de-DE")}</span>
-                  <span>
+                <div className="termini-list-row users-list-item termini-grid-7" key={t.id}>
+                  <span data-label="Datum" style={{ fontWeight: 700 }}>{new Date(t.datum).toLocaleDateString("de-DE")}</span>
+                  <span data-label="Vrijeme">
                     <span className="badge plavo">
                       {t.vrijemePocetka.slice(0, 5)} - {t.vrijemeKraja.slice(0, 5)}
                     </span>
                   </span>
-                  <span>
+                  <span data-label="Kabinet">
                     <button 
                       className="text-button" 
                       onClick={() => loadEquipment(t.kabinetID, t.kabinetNaziv)}
@@ -140,12 +140,12 @@ function Zakazivanje() {
                       {t.kabinetNaziv}
                     </button>
                   </span>
-                  <span>{t.profesorIme}</span>
-                  <span>{t.brojOdobrenih} / {t.limitOsoba || "∞"}</span>
-                  <span>
+                  <span data-label="Profesor">{t.profesorIme}</span>
+                  <span data-label="Popunjenost">{t.brojOdobrenih} / {t.limitOsoba || "∞"}</span>
+                  <span data-label="Vidljivost">
                     <span className="badge sivo">Javno</span>
                   </span>
-                  <span>
+                  <span data-label="Akcija">
                     {t.statusPrijave === "NaCekanju" ? (
                       <span className="badge crveno">Zahtjev u obradi</span>
                     ) : t.statusPrijave === "Odbijen" ? (

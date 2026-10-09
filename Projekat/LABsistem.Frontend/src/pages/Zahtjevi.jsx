@@ -73,18 +73,18 @@ function Zahtjevi() {
           <div className="users-list">
             {zahtjevi.map((z) => (
               <div className="termini-list-row users-list-item" key={z.id}>
-                <span style={{ fontWeight: 700 }}>{z.studentIme}</span>
-                <span>{z.kabinetNaziv}</span>
-                <span>
+                <span data-label="Student" style={{ fontWeight: 700 }}>{z.studentIme}</span>
+                <span data-label="Kabinet">{z.kabinetNaziv}</span>
+                <span data-label="Datum i vrijeme">
                   {new Date(z.datum).toLocaleDateString("de-DE")} <br />
                   <small className="badge plavo">
                     {z.vrijemePocetka.slice(0, 5)} - {z.vrijemeKraja.slice(0, 5)}
                   </small>
                 </span>
-                <span>
+                <span data-label="Status">
                   <span className="badge sivo">{z.statusZahtjeva}</span>
                 </span>
-                <span>
+                <span data-label="Akcije">
                   <div className="users-actions">
                     <button className="button" onClick={() => otvoriOdgovor(z.id, true)}>
                       Odobri

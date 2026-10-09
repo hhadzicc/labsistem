@@ -1,5 +1,6 @@
-import { useState } from "react";
+import { useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
+import { AlertCircle, Eye, EyeOff } from "lucide-react";
 import api from "../api/client";
 import {
   clearSession,
@@ -21,42 +22,11 @@ function extractErrorMessage(error, fallbackMessage) {
   return fallbackMessage;
 }
 
-function PasswordVisibilityIcon({ visible }) {
-  if (visible) {
-    return (
-      <svg
-        aria-hidden="true"
-        viewBox="0 0 24 24"
-        className="password-toggle-icon"
-        fill="none"
-        stroke="currentColor"
-        strokeWidth="2"
-        strokeLinecap="round"
-        strokeLinejoin="round"
-      >
-        <path d="M2 12s3.5-7 10-7 10 7 10 7-3.5 7-10 7-10-7-10-7Z" />
-        <circle cx="12" cy="12" r="3" />
-      </svg>
-    );
-  }
-
-  return (
-    <svg
-      aria-hidden="true"
-      viewBox="0 0 24 24"
-      className="password-toggle-icon"
-      fill="none"
-      stroke="currentColor"
-      strokeWidth="2"
-      strokeLinecap="round"
-      strokeLinejoin="round"
-    >
-      <path d="m3 3 18 18" />
-      <path d="M10.6 10.7A3 3 0 0 0 9 12a3 3 0 0 0 4.3 2.7" />
-      <path d="M9.4 5.2A10.8 10.8 0 0 1 12 5c6.5 0 10 7 10 7a17.7 17.7 0 0 1-3 3.8" />
-      <path d="M6.7 6.7C4.2 8.3 2.7 11 2 12c0 0 3.5 7 10 7 1.6 0 3-.4 4.3-1" />
-    </svg>
-  );
+function validatePassword(value) {
+  if (!value.trim()) return "Nova lozinka je obavezna.";
+  if (value.trim().length < 8) return "Lozinka mora imati najmanje 8 karaktera.";
+  if (value.trim().length > 64) return "Lozinka može imati najviše 64 karaktera.";
+  return "";
 }
 
 function FirstLoginPassword() {
@@ -70,10 +40,22 @@ function FirstLoginPassword() {
   const [submitting, setSubmitting] = useState(false);
   const [errorMessage, setErrorMessage] = useState("");
   const [successMessage, setSuccessMessage] = useState("");
+  const [touched, setTouched] = useState({});
+  const [submitted, setSubmitted] = useState(false);
+
+  const errors = useMemo(() => ({
+    newPassword: validatePassword(form.newPassword),
+    confirmPassword: !form.confirmPassword.trim()
+      ? "Potvrda nove lozinke je obavezna."
+      : form.newPassword.trim() !== form.confirmPassword.trim()
+        ? "Nova lozinka i potvrda se ne poklapaju."
+        : "",
+  }), [form]);
 
   function handleChange(event) {
     const { name, value } = event.target;
     setForm((current) => ({ ...current, [name]: value }));
+    setErrorMessage("");
   }
 
   async function handleBackToLogin() {
@@ -89,11 +71,12 @@ function FirstLoginPassword() {
 
   async function handleSubmit(event) {
     event.preventDefault();
+    setSubmitted(true);
+    setTouched({ newPassword: true, confirmPassword: true });
     setErrorMessage("");
     setSuccessMessage("");
 
-    if (!form.newPassword || !form.confirmPassword) {
-      setErrorMessage("Oba polja za novu lozinku su obavezna.");
+    if (errors.newPassword || errors.confirmPassword) {
       return;
     }
 
@@ -134,9 +117,6 @@ function FirstLoginPassword() {
           Prije nastavka rada sada samo postavite svoju novu lozinku.
         </p>
 
-        {errorMessage && (
-          <p className="form-error auth-success-note">{errorMessage}</p>
-        )}
         {successMessage && (
           <p className="form-success auth-success-note">{successMessage}</p>
         )}
@@ -151,8 +131,12 @@ function FirstLoginPassword() {
                 type={showNewPassword ? "text" : "password"}
                 value={form.newPassword}
                 onChange={handleChange}
+                onBlur={() => setTouched((current) => ({ ...current, newPassword: true }))}
                 autoComplete="new-password"
                 placeholder="Unesite novu lozinku"
+                className={(touched.newPassword || submitted) && errors.newPassword ? "input-error" : ""}
+                aria-invalid={Boolean((touched.newPassword || submitted) && errors.newPassword)}
+                aria-describedby={(touched.newPassword || submitted) && errors.newPassword ? "first-password-error" : undefined}
               />
               <button
                 type="button"
@@ -161,9 +145,12 @@ function FirstLoginPassword() {
                 aria-pressed={showNewPassword}
                 onClick={() => setShowNewPassword((current) => !current)}
               >
-                <PasswordVisibilityIcon visible={showNewPassword} />
+                {showNewPassword ? <Eye size={20} aria-hidden="true" /> : <EyeOff size={20} aria-hidden="true" />}
               </button>
             </div>
+            {(touched.newPassword || submitted) && errors.newPassword && (
+              <p className="field-error" id="first-password-error">{errors.newPassword}</p>
+            )}
           </div>
 
           <div className="form-group">
@@ -175,8 +162,12 @@ function FirstLoginPassword() {
                 type={showConfirmPassword ? "text" : "password"}
                 value={form.confirmPassword}
                 onChange={handleChange}
+                onBlur={() => setTouched((current) => ({ ...current, confirmPassword: true }))}
                 autoComplete="new-password"
                 placeholder="Ponovite novu lozinku"
+                className={(touched.confirmPassword || submitted) && errors.confirmPassword ? "input-error" : ""}
+                aria-invalid={Boolean((touched.confirmPassword || submitted) && errors.confirmPassword)}
+                aria-describedby={(touched.confirmPassword || submitted) && errors.confirmPassword ? "first-confirm-error" : errorMessage ? "first-password-api-error" : undefined}
               />
               <button
                 type="button"
@@ -185,9 +176,18 @@ function FirstLoginPassword() {
                 aria-pressed={showConfirmPassword}
                 onClick={() => setShowConfirmPassword((current) => !current)}
               >
-                <PasswordVisibilityIcon visible={showConfirmPassword} />
+                {showConfirmPassword ? <Eye size={20} aria-hidden="true" /> : <EyeOff size={20} aria-hidden="true" />}
               </button>
             </div>
+            {(touched.confirmPassword || submitted) && errors.confirmPassword && (
+              <p className="field-error" id="first-confirm-error">{errors.confirmPassword}</p>
+            )}
+            {!errors.confirmPassword && errorMessage && (
+              <div className="field-message error" id="first-password-api-error" role="alert">
+                <AlertCircle size={16} aria-hidden="true" />
+                <span>{errorMessage}</span>
+              </div>
+            )}
           </div>
 
           <button

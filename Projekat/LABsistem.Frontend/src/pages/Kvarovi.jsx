@@ -28,6 +28,8 @@ function Kvarovi() {
   const [saving, setSaving] = useState(false);
   const [notificationText, setNotificationText] = useState("");
   const [notificationSaving, setNotificationSaving] = useState(false);
+  const [notificationSubmitted, setNotificationSubmitted] = useState(false);
+  const [resolutionSubmitted, setResolutionSubmitted] = useState(false);
 
   useEffect(() => {
     loadEvidencije();
@@ -48,13 +50,14 @@ function Kvarovi() {
   function openDetails(item) {
     setSelected(item);
     setResolutionText(item.rjesenje || "");
+    setResolutionSubmitted(false);
   }
 
   async function updateStatus(status) {
     if (!selected) return;
 
     if (status === "Riješeno" && !resolutionText.trim()) {
-      setMessage({ type: "error", text: "Unesite kako je problem rijesen." });
+      setResolutionSubmitted(true);
       return;
     }
 
@@ -81,9 +84,9 @@ function Kvarovi() {
 
   async function sendGeneralNotification(event) {
     event.preventDefault();
+    setNotificationSubmitted(true);
 
     if (!notificationText.trim()) {
-      setMessage({ type: "error", text: "Unesite tekst obavijesti." });
       return;
     }
 
@@ -94,6 +97,7 @@ function Kvarovi() {
       });
 
       setNotificationText("");
+      setNotificationSubmitted(false);
       setMessage({
         type: "success",
         text: response.data?.message || "Obavijest je poslana korisnicima.",
@@ -137,18 +141,22 @@ function Kvarovi() {
         <p style={{ color: "var(--text-muted, #64748b)", marginBottom: 16 }}>
           Posaljite kratku obavijest o kvarovima, servisu ili promjeni dostupnosti opreme svim aktivnim korisnicima.
         </p>
-        <form onSubmit={sendGeneralNotification}>
+        <form onSubmit={sendGeneralNotification} noValidate>
           <div className="form-group">
-            <label>Tekst obavijesti</label>
+            <label htmlFor="opca-obavijest">Tekst obavijesti</label>
             <textarea
+              id="opca-obavijest"
               value={notificationText}
               onChange={(event) => setNotificationText(event.target.value)}
               rows={3}
               maxLength={500}
-              required
+              className={notificationSubmitted && !notificationText.trim() ? "input-error" : ""}
+              aria-invalid={Boolean(notificationSubmitted && !notificationText.trim())}
+              aria-describedby={notificationSubmitted && !notificationText.trim() ? "opca-obavijest-error" : "opca-obavijest-count"}
               placeholder="Npr. Projektor u Lab 101 je privremeno van upotrebe zbog servisa."
             />
-            <small style={{ color: "var(--text-muted, #64748b)" }}>
+            {notificationSubmitted && !notificationText.trim() && <p className="field-error" id="opca-obavijest-error">Unesite tekst obavijesti.</p>}
+            <small id="opca-obavijest-count" style={{ color: "var(--text-muted, #64748b)" }}>
               {notificationText.length}/500 karaktera
             </small>
           </div>
@@ -179,9 +187,9 @@ function Kvarovi() {
                   style={{ cursor: "pointer" }}
                   onClick={() => openDetails(evidencija)}
                 >
-                  <span style={{ fontWeight: 700 }}>{evidencija.opremaNaziv}</span>
-                  <span>{evidencija.korisnikImePrezime}</span>
-                  <span>
+                  <span data-label="Oprema" style={{ fontWeight: 700 }}>{evidencija.opremaNaziv}</span>
+                  <span data-label="Prijavio">{evidencija.korisnikImePrezime}</span>
+                  <span data-label="Termin">
                     {evidencija.terminDatum ? formatDateTime(evidencija.terminDatum) : "N/A"}
                     {evidencija.terminVrijemePocetka && (
                       <div>
@@ -191,8 +199,8 @@ function Kvarovi() {
                       </div>
                     )}
                   </span>
-                  <span>{formatDateTime(evidencija.prijavljenoU)}</span>
-                  <span>
+                  <span data-label="Prijavljeno">{formatDateTime(evidencija.prijavljenoU)}</span>
+                  <span data-label="Status">
                     <span className={`badge ${meta.color}`}>{meta.label}</span>
                   </span>
                 </div>
@@ -233,10 +241,13 @@ function Kvarovi() {
               <label style={{ display: "block", marginBottom: 8, fontWeight: 600 }}>Rješenje problema</label>
               <textarea
                 value={resolutionText}
-                onChange={(event) => setResolutionText(event.target.value)}
+                onChange={(event) => { setResolutionText(event.target.value); setResolutionSubmitted(false); }}
                 rows={4}
                 maxLength={500}
                 placeholder="Npr. Zamijenjen kabl napajanja i testirano na drugom portu."
+                className={resolutionSubmitted && !resolutionText.trim() ? "input-error" : ""}
+                aria-invalid={Boolean(resolutionSubmitted && !resolutionText.trim())}
+                aria-describedby="rjesenje-kvara-error"
                 style={{
                   width: "100%",
                   padding: "8px",
@@ -249,6 +260,7 @@ function Kvarovi() {
                   boxSizing: "border-box",
                 }}
               />
+              {resolutionSubmitted && !resolutionText.trim() && <p className="field-error" id="rjesenje-kvara-error">Unesite kako je problem riješen.</p>}
             </div>
 
             <div className="users-modal-actions" style={{ flexWrap: "wrap" }}>

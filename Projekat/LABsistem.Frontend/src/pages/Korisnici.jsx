@@ -621,7 +621,7 @@ function getDeactivateTooltip(user) {
             </p>
           )}
 
-          <div className="users-list-header users-list-row">
+          <div className="users-list-header users-list-row accounts-list-row">
             <span>Ime i prezime</span>
             <span>Email</span>
             <span>Status emaila</span>
@@ -643,28 +643,28 @@ function getDeactivateTooltip(user) {
 
                 return (
                   <div
-                    className={`users-list-row users-list-item${activeUser ? "" : " is-muted"}`}
+                    className={`users-list-row users-list-item accounts-list-row${activeUser ? "" : " is-muted"}`}
                     key={user.userId}
                     >
-                      <span>{user.imePrezime}</span>
-                      <span>{user.email}</span>
-                      <span>
+                      <span data-label="Ime i prezime">{user.imePrezime}</span>
+                      <span data-label="Email">{user.email}</span>
+                      <span data-label="Status emaila">
                         <span className={`badge ${user.emailVerified ? "zeleno" : "sivo"}`}>
                           {getEmailVerificationLabel(user)}
                         </span>
                       </span>
-                      <span>{user.username}</span>
-                      <span>
+                      <span data-label="Korisničko ime">{user.username}</span>
+                      <span data-label="Uloga">
                         <span className="badge sivo">
                           {getRoleLabel(user.role)}
                         </span>
                     </span>
-                    <span>
+                    <span data-label="Status">
                       <span className={`badge ${activeUser ? "zeleno" : "crveno"}`}>
                         {getUserStatusLabel(user)}
                       </span>
                     </span>
-                    <span>
+                    <span data-label="Akcije">
                       <div className="users-actions">
                         <button
                           type="button"

@@ -60,6 +60,9 @@ function Oprema() {
   const [detailsModalOpen, setDetailsModalOpen] = useState(false);
   const [detailsOprema, setDetailsOprema] = useState(null);
   const [message, setMessage] = useState({ type: "", text: "" });
+  const [formErrors, setFormErrors] = useState({});
+  const [touched, setTouched] = useState({});
+  const [submitted, setSubmitted] = useState(false);
 
   const userRole = getLocalRole();
   const currentUserId = getCurrentUserId();
@@ -154,8 +157,27 @@ function Oprema() {
   function handleFormChange(event) {
     const { name, value } = event.target;
     const processedValue = name === "stanje" || name === "kabinetID" ? Number(value) : value;
+    const next = { ...formState, [name]: processedValue };
+    setFormState(next);
+    setFormErrors(validateForm(next, selectedObjekatID));
+    setMessage({ type: "", text: "" });
+  }
 
-    setFormState((previous) => ({ ...previous, [name]: processedValue }));
+  function validateForm(values = formState, objekatID = selectedObjekatID) {
+    const errors = {};
+    if (!values.naziv?.trim()) errors.naziv = "Unesite naziv opreme.";
+    if (!values.kategorija?.trim()) errors.kategorija = "Unesite kategoriju opreme.";
+    if (!objekatID) errors.objekatID = "Odaberite objekat.";
+    if (!values.kabinetID) errors.kabinetID = "Odaberite kabinet.";
+    if (values.dokumentacijaUrl?.trim()) {
+      try {
+        const parsedUrl = new URL(values.dokumentacijaUrl.trim());
+        if (!["http:", "https:"].includes(parsedUrl.protocol)) throw new Error();
+      } catch {
+        errors.dokumentacijaUrl = "Unesite ispravan HTTP ili HTTPS link.";
+      }
+    }
+    return errors;
   }
 
   function handleDocumentationFileChange(event) {
@@ -229,6 +251,9 @@ function Oprema() {
     setDocumentationFile(null);
     setExistingDocumentationFile("");
     setMessage({ type: "", text: "" });
+    setFormErrors({});
+    setTouched({});
+    setSubmitted(false);
     setModalOpen(true);
   }
 
@@ -248,13 +273,22 @@ function Oprema() {
     setDocumentationFile(null);
     setExistingDocumentationFile(oprema.dokumentacijaFileName || "");
     setMessage({ type: "", text: "" });
+    setFormErrors({});
+    setTouched({});
+    setSubmitted(false);
     setModalOpen(true);
   }
 
   async function handleSubmit(event) {
     event.preventDefault();
-    setSaving(true);
+    setSubmitted(true);
     setMessage({ type: "", text: "" });
+
+    const errors = validateForm();
+    setFormErrors(errors);
+    if (Object.keys(errors).length > 0) return;
+
+    setSaving(true);
 
     try {
       const payload = new FormData();
@@ -494,7 +528,7 @@ function Oprema() {
             </p>
           )}
 
-          <div className="users-list-header users-list-row">
+          <div className="users-list-header users-list-row equipment-list-row">
             <span>Naziv</span>
             <span>Kategorija</span>
             <span>Serijski broj</span>
@@ -510,23 +544,23 @@ function Oprema() {
           ) : visibleOprema.length > 0 ? (
             <div className="users-list">
               {visibleOprema.map((item) => (
-                <div className="users-list-row users-list-item" key={item.id}>
-                  <span style={{ fontWeight: 600 }}>{item.naziv}</span>
-                  <span>{item.kategorija || "N/A"}</span>
-                  <span>{item.serijskiBroj}</span>
-                  <span>
+                <div className="users-list-row users-list-item equipment-list-row" key={item.id}>
+                  <span data-label="Naziv" style={{ fontWeight: 600 }}>{item.naziv}</span>
+                  <span data-label="Kategorija">{item.kategorija || "N/A"}</span>
+                  <span data-label="Serijski broj">{item.serijskiBroj}</span>
+                  <span data-label="Status">
                     <span className={`badge ${getStatusInfo(item.stanje).color}`}>
                       {getStatusInfo(item.stanje).label}
                     </span>
                   </span>
-                  <span>
+                  <span data-label="Arhiva">
                     <span className={`badge ${item.isArchived ? "sivo" : "zeleno"}`}>
                       {item.isArchived ? "Arhivirana" : "Aktivna"}
                     </span>
                   </span>
-                  <span>{item.kabinetNaziv}</span>
-                  <span>{item.zgradaNaziv}</span>
-                  <span>
+                  <span data-label="Kabinet">{item.kabinetNaziv}</span>
+                  <span data-label="Zgrada">{item.zgradaNaziv}</span>
+                  <span data-label="Akcije">
                     <div className="users-actions">
                       <button className="users-action-btn" onClick={() => openDetailsModal(item)}>
                         Detalji
@@ -581,22 +615,28 @@ function Oprema() {
               </p>
             )}
 
-            <form onSubmit={handleSubmit}>
+            <form onSubmit={handleSubmit} noValidate>
               <div className="form-group">
-                <label>Naziv</label>
-                <input name="naziv" value={formState.naziv} onChange={handleFormChange} required />
+                <label htmlFor="oprema-naziv">Naziv</label>
+                <input id="oprema-naziv" name="naziv" value={formState.naziv} onChange={handleFormChange} onBlur={() => setTouched(prev => ({ ...prev, naziv: true }))} className={(submitted || touched.naziv) && formErrors.naziv ? "input-error" : ""} aria-invalid={Boolean((submitted || touched.naziv) && formErrors.naziv)} aria-describedby="oprema-naziv-error" />
+                {(submitted || touched.naziv) && formErrors.naziv && <p className="field-error" id="oprema-naziv-error">{formErrors.naziv}</p>}
               </div>
 
               <div className="form-group">
-                <label>Kategorija</label>
+                <label htmlFor="oprema-kategorija">Kategorija</label>
                 <input
+                  id="oprema-kategorija"
                   name="kategorija"
                   value={formState.kategorija}
                   onChange={handleFormChange}
                   placeholder="npr. laptop, osciloskop, projektor"
                   maxLength={40}
-                  required
+                  onBlur={() => setTouched(prev => ({ ...prev, kategorija: true }))}
+                  className={(submitted || touched.kategorija) && formErrors.kategorija ? "input-error" : ""}
+                  aria-invalid={Boolean((submitted || touched.kategorija) && formErrors.kategorija)}
+                  aria-describedby="oprema-kategorija-error"
                 />
+                {(submitted || touched.kategorija) && formErrors.kategorija && <p className="field-error" id="oprema-kategorija-error">{formErrors.kategorija}</p>}
               </div>
 
               <div className="form-group">
@@ -616,14 +656,20 @@ function Oprema() {
               </div>
 
               <div className="form-group">
-                <label>Objekat</label>
+                <label htmlFor="oprema-objekat">Objekat</label>
                 <select
+                  id="oprema-objekat"
                   value={selectedObjekatID}
                   onChange={(event) => {
                     setSelectedObjekatID(event.target.value);
                     setFormState((previous) => ({ ...previous, kabinetID: "" }));
+                    setTouched(prev => ({ ...prev, objekatID: true }));
+                    setFormErrors(validateForm({ ...formState, kabinetID: "" }, event.target.value));
                   }}
-                  required
+                  onBlur={() => setTouched(prev => ({ ...prev, objekatID: true }))}
+                  className={(submitted || touched.objekatID) && formErrors.objekatID ? "input-error" : ""}
+                  aria-invalid={Boolean((submitted || touched.objekatID) && formErrors.objekatID)}
+                  aria-describedby="oprema-objekat-error"
                 >
                   <option value="">-- Odaberi objekat --</option>
                   {objekti.map((objekat) => (
@@ -632,16 +678,21 @@ function Oprema() {
                     </option>
                   ))}
                 </select>
+                {(submitted || touched.objekatID) && formErrors.objekatID && <p className="field-error" id="oprema-objekat-error">{formErrors.objekatID}</p>}
               </div>
 
               <div className="form-group">
-                <label>Kabinet</label>
+                <label htmlFor="oprema-kabinet">Kabinet</label>
                 <select
+                  id="oprema-kabinet"
                   name="kabinetID"
                   value={formState.kabinetID}
                   onChange={handleFormChange}
-                  required
                   disabled={!selectedObjekatID}
+                  onBlur={() => setTouched(prev => ({ ...prev, kabinetID: true }))}
+                  className={(submitted || touched.kabinetID) && formErrors.kabinetID ? "input-error" : ""}
+                  aria-invalid={Boolean((submitted || touched.kabinetID) && formErrors.kabinetID)}
+                  aria-describedby="oprema-kabinet-error"
                 >
                   <option value="">
                     {selectedObjekatID ? "-- Odaberi kabinet --" : "Prvo odaberi objekat"}
@@ -652,6 +703,7 @@ function Oprema() {
                     </option>
                   ))}
                 </select>
+                {(submitted || touched.kabinetID) && formErrors.kabinetID && <p className="field-error" id="oprema-kabinet-error">{formErrors.kabinetID}</p>}
               </div>
 
               <div className="form-group">
@@ -669,15 +721,27 @@ function Oprema() {
               </div>
 
               <div className="form-group">
-                <label>URL uputstva ili video materijala</label>
+                <label htmlFor="oprema-dokumentacija-url">URL uputstva ili video materijala</label>
                 <input
+                  id="oprema-dokumentacija-url"
                   type="url"
                   name="dokumentacijaUrl"
                   value={formState.dokumentacijaUrl}
                   onChange={handleDocumentationUrlChange}
+                  onBlur={() => {
+                    setTouched(prev => ({ ...prev, dokumentacijaUrl: true }));
+                    setFormErrors(validateForm());
+                  }}
+                  className={(submitted || touched.dokumentacijaUrl) && formErrors.dokumentacijaUrl ? "input-error" : ""}
+                  aria-invalid={Boolean((submitted || touched.dokumentacijaUrl) && formErrors.dokumentacijaUrl)}
+                  aria-describedby={formErrors.dokumentacijaUrl ? "oprema-url-error" : "oprema-url-hint"}
                   placeholder="https://example.com/uputstvo"
                 />
-                <div className="users-field-hint">Unesite link samo ako ne dodajete PDF.</div>
+                {(submitted || touched.dokumentacijaUrl) && formErrors.dokumentacijaUrl ? (
+                  <p className="field-error" id="oprema-url-error">{formErrors.dokumentacijaUrl}</p>
+                ) : (
+                  <div className="users-field-hint" id="oprema-url-hint">Unesite link samo ako ne dodajete PDF.</div>
+                )}
               </div>
 
               <div className="users-modal-actions">

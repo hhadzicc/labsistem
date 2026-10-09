@@ -80,14 +80,12 @@ export default function NotifikacijaBell() {
   }
 
   return (
-    <div ref={ref} style={{ position: "relative" }}>
+    <div ref={ref} className="notification-bell">
       <button
         onClick={toggleOpen}
-        style={{
-          background: "none", border: "none", cursor: "pointer",
-          position: "relative", padding: "6px", color: "var(--text)",
-          display: "flex", alignItems: "center", justifyContent: "center"
-        }}
+        className="notification-trigger"
+        aria-label="Obavijesti"
+        aria-expanded={open}
         title="Obavijesti"
       >
         {/* SVG ikonica */}
@@ -95,46 +93,25 @@ export default function NotifikacijaBell() {
           <path d="M12 22c1.1 0 2-.9 2-2h-4c0 1.1.9 2 2 2zm6-6v-5c0-3.07-1.64-5.64-4.5-6.32V4c0-.83-.67-1.5-1.5-1.5s-1.5.67-1.5 1.5v.68C7.63 5.36 6 7.92 6 11v5l-2 2v1h16v-1l-2-2z"/>
         </svg>
         {broj > 0 && (
-          <span style={{
-            position: "absolute", top: "0", right: "0",
-            background: "#ef4444", color: "#fff",
-            borderRadius: "50%", fontSize: "10px", fontWeight: "700",
-            width: "16px", height: "16px",
-            display: "flex", alignItems: "center", justifyContent: "center",
-            lineHeight: 1
-          }}>
+          <span className="notification-count">
             {broj > 9 ? "9+" : broj}
           </span>
         )}
       </button>
 
       {open && (
-        <div style={{
-          position: "absolute", right: 0, top: "calc(100% + 8px)", zIndex: 1000,
-          width: "340px", background: "var(--card-bg, #fff)",
-          border: "1px solid var(--border)", borderRadius: "12px",
-          boxShadow: "0 8px 24px rgba(0,0,0,0.12)", overflow: "hidden"
-        }}>
+        <div className="notification-panel">
           {/* Header */}
-          <div style={{
-            display: "flex", alignItems: "center", justifyContent: "space-between",
-            padding: "12px 16px", borderBottom: "1px solid var(--border)"
-          }}>
+          <div className="notification-header">
             <span style={{ fontWeight: "700", fontSize: "14px" }}>Obavijesti</span>
-            <div style={{ display: "flex", gap: "8px" }}>
+            <div className="notification-header-actions">
               {broj > 0 && (
-                <button onClick={oznaciSve} style={{
-                  background: "none", border: "none", cursor: "pointer",
-                  fontSize: "12px", color: "var(--primary, #2563eb)"
-                }}>
+                <button onClick={oznaciSve} className="notification-text-button">
                   Označi sve
                 </button>
               )}
               {lista.length > 0 && (
-                <button onClick={obrisiSve} style={{
-                  background: "none", border: "none", cursor: "pointer",
-                  fontSize: "12px", color: "#ef4444"
-                }}>
+                <button onClick={obrisiSve} className="notification-text-button danger">
                   Obriši sve
                 </button>
               )}
@@ -142,7 +119,7 @@ export default function NotifikacijaBell() {
           </div>
 
           {/* Lista */}
-          <div style={{ maxHeight: "360px", overflowY: "auto" }}>
+          <div className="notification-list">
             {lista.length === 0 ? (
               <div style={{
                 padding: "24px 16px", textAlign: "center",
@@ -155,26 +132,16 @@ export default function NotifikacijaBell() {
                 <div
                   key={n.id}
                   onClick={() => !n.dostupnost && oznaciJednu(n.id)}
-                  style={{
-                    padding: "10px 16px",
-                    borderBottom: "1px solid var(--border)",
-                    background: n.dostupnost ? "transparent" : "var(--hover-bg, #f0f7ff)",
-                    cursor: n.dostupnost ? "default" : "pointer",
-                    display: "flex", alignItems: "flex-start", gap: "8px"
-                  }}
+                  className={`notification-item${n.dostupnost ? "" : " unread"}`}
                 >
-                  <div style={{ flex: 1, minWidth: 0 }}>
-                    <div style={{ fontSize: "13px", color: "var(--text)", lineHeight: "1.4" }}>
+                  <div className="notification-item-body">
+                    <div className="notification-message">
                       {!n.dostupnost && (
-                        <span style={{
-                          display: "inline-block", width: "7px", height: "7px",
-                          borderRadius: "50%", background: "#2563eb",
-                          marginRight: "6px", verticalAlign: "middle", flexShrink: 0
-                        }} />
+                        <span className="notification-unread-dot" />
                       )}
                       {n.novosti}
                     </div>
-                    <div style={{ fontSize: "11px", color: "var(--text-muted)", marginTop: "4px" }}>
+                    <div className="notification-time">
                       {formatVrijeme(n.datumKreiranja)}
                     </div>
                   </div>
@@ -182,13 +149,7 @@ export default function NotifikacijaBell() {
                   <button
                     onClick={(e) => obrisiJednu(n.id, e)}
                     title="Obriši"
-                    style={{
-                      background: "none", border: "none", cursor: "pointer",
-                      color: "var(--text-muted)", fontSize: "14px", padding: "0 2px",
-                      lineHeight: 1, flexShrink: 0, marginTop: "2px"
-                    }}
-                    onMouseEnter={e => e.currentTarget.style.color = "#ef4444"}
-                    onMouseLeave={e => e.currentTarget.style.color = "var(--text-muted)"}
+                    className="notification-delete"
                   >
                     ×
                   </button>

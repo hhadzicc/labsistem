@@ -1,9 +1,39 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { NavLink, useLocation, useNavigate } from "react-router-dom";
+import {
+  Building2,
+  CalendarClock,
+  CalendarDays,
+  CalendarPlus,
+  ClipboardCheck,
+  History,
+  Inbox,
+  LayoutDashboard,
+  MonitorCog,
+  Moon,
+  Sun,
+  Users,
+  Wrench,
+  X,
+} from "lucide-react";
 import { NAVIGATION_BY_ROLE, ROLE_LABELS, getCurrentRole } from "../auth/routeAccess";
 import api from "../api/client";
 import { clearSession, getRefreshToken } from "../auth/session";
 import NotifikacijaBell from "../pages/NotifikacijaBell";
+
+const NAV_ICON_BY_PATH = {
+  "/dashboard": LayoutDashboard,
+  "/kalendar": CalendarDays,
+  "/zakazivanje": CalendarPlus,
+  "/rezervacije": ClipboardCheck,
+  "/zahtjevi": Inbox,
+  "/historija": History,
+  "/oprema": MonitorCog,
+  "/termini": CalendarClock,
+  "/kvarovi": Wrench,
+  "/korisnici": Users,
+  "/objekti": Building2,
+};
 
 function Layout({ children }) {
   const navigate = useNavigate();
@@ -15,6 +45,7 @@ function Layout({ children }) {
   );
   const navStavke = NAVIGATION_BY_ROLE[uloga] || NAVIGATION_BY_ROLE.student;
   const [menuOtvoren, setMenuOtvoren] = useState(false);
+  const [mobilniMeniOtvoren, setMobilniMeniOtvoren] = useState(false);
   const accountMenuRef = useRef(null);
   const inicijal = useMemo(() => korisnik.trim().charAt(0).toUpperCase() || "K", [korisnik]);
 
@@ -34,7 +65,21 @@ function Layout({ children }) {
 
   useEffect(() => {
     setMenuOtvoren(false);
+    setMobilniMeniOtvoren(false);
   }, [location.pathname]);
+
+  useEffect(() => {
+    const handleEscape = (event) => {
+      if (event.key === "Escape") setMobilniMeniOtvoren(false);
+    };
+
+    document.body.classList.toggle("mobile-nav-open", mobilniMeniOtvoren);
+    document.addEventListener("keydown", handleEscape);
+    return () => {
+      document.body.classList.remove("mobile-nav-open");
+      document.removeEventListener("keydown", handleEscape);
+    };
+  }, [mobilniMeniOtvoren]);
 
   useEffect(() => {
     let aktivno = true;
@@ -97,30 +142,73 @@ function Layout({ children }) {
   };
   return (
     <div className="app-layout">
-      <aside className="sidebar">
-        <NavLink to="/dashboard" style={{ textDecoration: "none" }}>
-          <div className="sidebar-logo">LAB<span>sistem</span></div>
-        </NavLink>
+      <aside className={`sidebar ${mobilniMeniOtvoren ? "is-open" : ""}`} id="primary-navigation">
+        <div className="sidebar-header">
+          <NavLink to="/dashboard" style={{ textDecoration: "none" }}>
+            <div className="sidebar-logo">LAB<span>sistem</span></div>
+          </NavLink>
+          <button
+            type="button"
+            className="sidebar-close"
+            aria-label="Zatvori navigaciju"
+            onClick={() => setMobilniMeniOtvoren(false)}
+          >
+            <X size={22} aria-hidden="true" />
+          </button>
+        </div>
 
         <nav className="sidebar-nav">
           <span className="nav-section">{ROLE_LABELS[uloga]}</span>
-          {navStavke.map((stavka) => (
-            <NavLink
-              key={stavka.path}
-              to={stavka.path}
-              className={({ isActive }) => (isActive ? "active" : "")}
-            >
-              {stavka.label}
-            </NavLink>
-          ))}
+          <NavLink to="/dashboard" className={({ isActive }) => (isActive ? "active" : "")}>
+            <LayoutDashboard size={18} aria-hidden="true" />
+            <span>Pregled</span>
+          </NavLink>
+          {navStavke.map((stavka) => {
+            const NavIcon = NAV_ICON_BY_PATH[stavka.path] || LayoutDashboard;
+            return (
+              <NavLink
+                key={stavka.path}
+                to={stavka.path}
+                className={({ isActive }) => (isActive ? "active" : "")}
+              >
+                <NavIcon size={18} aria-hidden="true" />
+                <span>{stavka.label}</span>
+              </NavLink>
+            );
+          })}
         </nav>
       </aside>
 
+      <button
+        type="button"
+        className={`sidebar-backdrop ${mobilniMeniOtvoren ? "is-visible" : ""}`}
+        aria-label="Zatvori navigaciju"
+        tabIndex={mobilniMeniOtvoren ? 0 : -1}
+        onClick={() => setMobilniMeniOtvoren(false)}
+      />
+
       <div className="content-shell">
         <header className="topbar">
+          <button
+            type="button"
+            className="mobile-nav-toggle"
+            aria-label="Otvori navigaciju"
+            aria-controls="primary-navigation"
+            aria-expanded={mobilniMeniOtvoren}
+            onClick={() => setMobilniMeniOtvoren(true)}
+          >
+            <span />
+            <span />
+            <span />
+          </button>
+
+          <NavLink to="/dashboard" className="mobile-brand" aria-label="LABsistem početna">
+            LAB<span>sistem</span>
+          </NavLink>
+
           <div className="topbar-spacer" />
 
-          <div style={{ display: "flex", alignItems: "center", marginRight: "16px", gap: "8px" }}>
+          <div className="topbar-tools">
             <button
               onClick={toggleTheme}
               className="theme-toggle-btn"
@@ -146,15 +234,7 @@ function Layout({ children }) {
                 e.currentTarget.style.color = "var(--text-muted)";
               }}
             >
-              {theme === "light" ? (
-                <svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor">
-                  <path d="M12.3 22c-5.5 0-10-4.5-10-10 0-4.8 3.5-8.9 8.2-9.8.5-.1 1 .3.9.8-.1.4-.4.8-.4 1.2 0 4.4 3.6 8 8 8 .4 0 .8-.1 1.2-.2.5-.1.9.4.8.9-.9 4.7-5 8.1-9.7 8.1z"/>
-                </svg>
-              ) : (
-                <svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor">
-                  <path d="M12 7c-2.76 0-5 2.24-5 5s2.24 5 5 5 5-2.24 5-5-2.24-5-5-5zM2 13h2c.55 0 1-.45 1-1s-.45-1-1-1H2c-.55 0-1 .45-1 1s.45 1 1 1zm18 0h2c.55 0 1-.45 1-1s-.45-1-1-1h-2c-.55 0-1 .45-1 1s.45 1 1 1zM11 2v2c0 .55.45 1 1 1s1-.45 1-1V2c0-.55-.45-1-1-1s-1 .45-1 1zm0 18v2c0 .55.45 1 1 1s1-.45 1-1v-2c0-.55-.45-1-1-1s-1 .45-1 1zM5.99 4.58c-.39-.39-1.03-.39-1.41 0s-.39 1.03 0 1.41l1.06 1.06c.39.39 1.03.39 1.41 0s.39-1.03 0-1.41L5.99 4.58zm12.37 12.37c-.39-.39-1.03-.39-1.41 0s-.39 1.03 0 1.41l1.06 1.06c.39.39 1.03.39 1.41 0s.39-1.03 0-1.41l-1.06-1.06zm1.06-12.37c-.39-.39-.39-1.03 0-1.41s1.03-.39 1.41 0l1.06 1.06c.39.39.39 1.03 0 1.41s-1.03.39-1.41 0l-1.06-1.06zm-12.37 12.37c-.39-.39-.39-1.03 0-1.41s1.03-.39 1.41 0l1.06 1.06c.39.39.39 1.03 0 1.41s-1.03.39-1.41 0l-1.06-1.06z"/>
-                </svg>
-              )}
+              {theme === "light" ? <Moon size={20} aria-hidden="true" /> : <Sun size={20} aria-hidden="true" />}
             </button>
             <NotifikacijaBell />
           </div>
@@ -202,21 +282,8 @@ function Layout({ children }) {
         {showScrollButton && (
           <button
             onClick={scrollToTop}
-            style={{
-              position: "fixed",
-              bottom: "30px",
-              right: "30px",
-              background: "#0f766e",
-              color: "white",
-              border: "none",
-              borderRadius: "50%",
-              width: "50px",
-              height: "50px",
-              fontSize: "24px",
-              cursor: "pointer",
-              boxShadow: "0 4px 12px rgba(0,0,0,0.2)",
-              zIndex: 999
-            }}
+            className="scroll-to-top"
+            aria-label="Vrati se na vrh stranice"
           >
             ↑
           </button>

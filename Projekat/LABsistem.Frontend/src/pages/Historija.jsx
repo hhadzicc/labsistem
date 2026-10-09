@@ -40,6 +40,7 @@ function Historija() {
   const [equipmentLoading, setEquipmentLoading] = useState(false);
   const [reportModal, setReportModal] = useState(null);
   const [komentar, setKomentar] = useState("");
+  const [reportSubmitted, setReportSubmitted] = useState(false);
   const [saving, setSaving] = useState(false);
   const [filterOd, setFilterOd] = useState("");
   const [filterDo, setFilterDo] = useState("");
@@ -93,11 +94,14 @@ function Historija() {
 
   function otvoriPrijavu(oprema, termin) {
     setKomentar("");
+    setReportSubmitted(false);
     setReportModal({ oprema, termin });
   }
 
   async function posaljiPrijavu(e) {
     e.preventDefault();
+    setReportSubmitted(true);
+    if (!komentar.trim()) return;
     setSaving(true);
 
     try {
@@ -213,15 +217,15 @@ function Historija() {
               const allowed = canReportFault(termin);
               return (
                 <div className="users-list-item termini-list-row" key={termin.id} style={{ cursor: "pointer" }} onClick={() => otvoriTermin(termin)}>
-                  <span style={{ fontWeight: 700 }}>{formatDate(termin.datum)}</span>
-                  <span>
+                  <span data-label="Datum" style={{ fontWeight: 700 }}>{formatDate(termin.datum)}</span>
+                  <span data-label="Vrijeme">
                     <span className="badge plavo">
                       {formatTime(termin.vrijemePocetka)} - {formatTime(termin.vrijemeKraja)}
                     </span>
                   </span>
-                  <span>{termin.kabinetNaziv}</span>
-                  <span>{termin.profesorIme || "N/A"}</span>
-                  <span>
+                  <span data-label="Kabinet">{termin.kabinetNaziv}</span>
+                  <span data-label="Profesor">{termin.profesorIme || "N/A"}</span>
+                  <span data-label="Prijava kvara">
                     <span className={`badge ${allowed ? "zeleno" : "sivo"}`}>
                       {allowed ? "Kvar se moze prijaviti" : "Rok za prijavu je istekao"}
                     </span>
@@ -339,15 +343,18 @@ function Historija() {
               </div>
             </div>
 
-            <form onSubmit={posaljiPrijavu}>
+            <form onSubmit={posaljiPrijavu} noValidate>
               <div className="form-group">
-                <label>Komentar kvara</label>
+                <label htmlFor="prijava-kvara-komentar">Komentar kvara</label>
                 <textarea
+                  id="prijava-kvara-komentar"
                   value={komentar}
                   onChange={(event) => setKomentar(event.target.value)}
                   rows={4}
                   maxLength={500}
-                  required
+                  className={reportSubmitted && !komentar.trim() ? "input-error" : ""}
+                  aria-invalid={Boolean(reportSubmitted && !komentar.trim())}
+                  aria-describedby="prijava-kvara-error"
                   placeholder="Opis kvara, npr. projektor ne prikazuje sliku..."
                   style={{
                     width: "100%",
@@ -361,6 +368,7 @@ function Historija() {
                     boxSizing: "border-box",
                   }}
                 />
+                {reportSubmitted && !komentar.trim() && <p className="field-error" id="prijava-kvara-error">Opišite kvar prije slanja prijave.</p>}
               </div>
               <div className="users-modal-actions">
                 <button className="button" type="submit" disabled={saving}>

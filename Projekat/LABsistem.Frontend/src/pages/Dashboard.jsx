@@ -1,11 +1,25 @@
 import Layout from "../components/Layout";
 import { useEffect, useMemo, useState } from "react";
+import { useNavigate } from "react-router-dom";
+import {
+  Activity,
+  ArrowRight,
+  Building2,
+  CalendarDays,
+  CheckCircle2,
+  ClipboardCheck,
+  Clock3,
+  MonitorCog,
+  PackageOpen,
+  Users,
+  Wrench,
+} from "lucide-react";
 import api from "../api/client";
 import { getCurrentRole } from "../auth/routeAccess";
 
 const DASHBOARD_TEXT_BY_ROLE = {
   student: {
-    naslov: "Dobrodosli u LABsistem",
+    naslov: "Dobro došli u LABsistem",
     opis: "Pregledajte dostupne termine i upravljajte svojim rezervacijama.",
     tabelaNaslov: "Moje rezervacije",
     tabelaKolone: ["Laboratorij", "Datum", "Vrijeme", "Status"],
@@ -21,9 +35,42 @@ const DASHBOARD_TEXT_BY_ROLE = {
     opis: "Pregledajte termine, opremu i prijavljene kvarove.",
   },
   admin: {
-    naslov: "Administratorski panel",
-    opis: "Upravljajte korisnicima, objektima i kabinetima.",
+    naslov: "Administratorski pregled",
+    opis: "Upravljajte korisnicima, prostorima i osnovnim postavkama sistema.",
   },
+};
+
+const QUICK_ACTIONS_BY_ROLE = {
+  student: [
+    { label: "Pronađi termin", description: "Pregledaj slobodne laboratorije", path: "/zakazivanje", icon: CalendarDays },
+    { label: "Moje rezervacije", description: "Provjeri statuse svojih zahtjeva", path: "/rezervacije", icon: ClipboardCheck },
+    { label: "Kalendar", description: "Pogledaj raspored termina", path: "/kalendar", icon: Clock3 },
+  ],
+  profesor: [
+    { label: "Zahtjevi studenata", description: "Obradi pristigle zahtjeve", path: "/zahtjevi", icon: ClipboardCheck },
+    { label: "Novi termin", description: "Kreiraj termin za laboratorij", path: "/termini", icon: CalendarDays },
+    { label: "Pregled opreme", description: "Provjeri dostupnost resursa", path: "/oprema", icon: MonitorCog },
+  ],
+  tehnicar: [
+    { label: "Kvarovi opreme", description: "Obradi prijavljene probleme", path: "/kvarovi", icon: Wrench },
+    { label: "Upravljanje opremom", description: "Ažuriraj inventar laboratorija", path: "/oprema", icon: MonitorCog },
+    { label: "Termini", description: "Pregledaj današnje korištenje", path: "/termini", icon: CalendarDays },
+  ],
+  admin: [
+    { label: "Dodaj korisnika", description: "Kreiraj nalog i dodijeli ulogu", path: "/korisnici", icon: Users },
+    { label: "Uredi prostore", description: "Dodaj objekte i kabinete", path: "/objekti", icon: Building2 },
+    { label: "Pregled kalendara", description: "Provjeri zauzetost laboratorija", path: "/kalendar", icon: CalendarDays },
+  ],
+};
+
+const STAT_ICON_BY_TYPE = {
+  users: Users,
+  buildings: Building2,
+  rooms: PackageOpen,
+  equipment: MonitorCog,
+  calendar: CalendarDays,
+  requests: ClipboardCheck,
+  faults: Wrench,
 };
 
 const BADGE_KLASA = {
@@ -87,6 +134,7 @@ function isTerminToday(termin) {
 }
 
 function Dashboard() {
+  const navigate = useNavigate();
   const uloga = getCurrentRole();
   const tekst = DASHBOARD_TEXT_BY_ROLE[uloga] || DASHBOARD_TEXT_BY_ROLE.student;
 
@@ -97,6 +145,7 @@ function Dashboard() {
   const [evidencije, setEvidencije] = useState([]);
   const [loadingEvidencije, setLoadingEvidencije] = useState(false);
   const [opremaList, setOpremaList] = useState([]);
+  const [adminOverview, setAdminOverview] = useState(null);
 
   const healthStats = useMemo(() => {
     if (!Array.isArray(opremaList) || opremaList.length === 0) {
@@ -175,9 +224,9 @@ function Dashboard() {
     ).length;
 
     setStatCards([
-      { label: "Aktivne rezervacije", vrijednost: String(mojeRezervacije.length), klasa: "plavo" },
-      { label: "Dostupni termini", vrijednost: String(dostupniTermini.length), klasa: "" },
-      { label: "Zahtjevi na cekanju", vrijednost: String(pendingRequests), klasa: "amber" },
+      { label: "Aktivne rezervacije", vrijednost: String(mojeRezervacije.length), klasa: "blue", icon: "calendar", detail: "Predstojeći termini" },
+      { label: "Dostupni termini", vrijednost: String(dostupniTermini.length), klasa: "green", icon: "rooms", detail: "Otvoreno za prijavu" },
+      { label: "Zahtjevi na čekanju", vrijednost: String(pendingRequests), klasa: "amber", icon: "requests", detail: "Čekaju odobrenje" },
     ]);
 
     setTableData({
@@ -212,9 +261,10 @@ function Dashboard() {
     const javniTermini = mojeRezervacije.filter((termin) => termin.vidljivoStudentima).length;
 
     setStatCards([
-      { label: "Zahtjevi na cekanju", vrijednost: String(dolazniZahtjevi.length), klasa: "amber" },
-      { label: "Aktivne rezervacije", vrijednost: String(mojeRezervacije.length), klasa: "plavo" },
-      { label: "Javni termini", vrijednost: String(javniTermini), klasa: "" },
+      { label: "Zahtjevi na čekanju", vrijednost: String(dolazniZahtjevi.length), klasa: "amber", icon: "requests", detail: "Potrebna obrada" },
+      { label: "Aktivne rezervacije", vrijednost: String(mojeRezervacije.length), klasa: "blue", icon: "calendar", detail: "Predstojeći termini" },
+      { label: "Javni termini", vrijednost: String(javniTermini), klasa: "green", icon: "rooms", detail: "Vidljivo studentima" },
+      { label: "Ukupna oprema", vrijednost: String(oprema.length), klasa: "violet", icon: "equipment", detail: "Evidentirani resursi" },
     ]);
 
     setTableData({
@@ -250,9 +300,9 @@ function Dashboard() {
       const aktivniKvarovi = sveEvidencije.filter((evidencija) => evidencija.status === "Kvar").length;
 
       setStatCards([
-        { label: "Termini danas", vrijednost: String(termini.filter(isTerminToday).length), klasa: "plavo" },
-        { label: "Ukupna oprema", vrijednost: String(oprema.length), klasa: "" },
-        { label: "Prijavljeni kvarovi", vrijednost: String(aktivniKvarovi), klasa: "crveno" },
+        { label: "Termini danas", vrijednost: String(termini.filter(isTerminToday).length), klasa: "blue", icon: "calendar", detail: "Današnje korištenje" },
+        { label: "Ukupna oprema", vrijednost: String(oprema.length), klasa: "violet", icon: "equipment", detail: "Evidentirani resursi" },
+        { label: "Prijavljeni kvarovi", vrijednost: String(aktivniKvarovi), klasa: "red", icon: "faults", detail: "Zahtijevaju pažnju" },
       ]);
       setTableData(null);
     } finally {
@@ -275,11 +325,19 @@ function Dashboard() {
 
     const aktivniObjekti = objekti.filter((objekat) => Array.isArray(objekat.kabineti) && objekat.kabineti.length > 0).length;
 
-    setStatCards([
-      { label: "Ukupno korisnika", vrijednost: String(users.length), klasa: "blue" },
-      { label: "Aktivni objekti", vrijednost: String(aktivniObjekti), klasa: "" },
+    setAdminOverview({
+      users: users.length,
+      objekti: objekti.length,
+      aktivniObjekti,
+      kabineti: kabineti.length,
+      oprema: oprema.length,
+    });
 
-      { label: "Kabineti", vrijednost: String(kabineti.length), klasa: "" },
+    setStatCards([
+      { label: "Ukupno korisnika", vrijednost: String(users.length), klasa: "blue", icon: "users", detail: "Aktivni nalozi" },
+      { label: "Objekti", vrijednost: String(objekti.length), klasa: "green", icon: "buildings", detail: `${aktivniObjekti} s kabinetima` },
+      { label: "Kabineti", vrijednost: String(kabineti.length), klasa: "amber", icon: "rooms", detail: "Laboratorijski prostori" },
+      { label: "Oprema", vrijednost: String(oprema.length), klasa: "violet", icon: "equipment", detail: "Evidentirani resursi" },
     ]);
     setTableData(null);
   }
@@ -306,48 +364,107 @@ function Dashboard() {
 
   return (
     <Layout>
-      <div className="page-header">
-        <h1>{tekst.naslov}</h1>
-        <p>{tekst.opis}</p>
-      </div>
+      <div className="dashboard-page">
+        <div className="dashboard-heading">
+          <div>
+            <span className="dashboard-eyebrow">Radni pregled</span>
+            <h1>{tekst.naslov}</h1>
+            <p>{tekst.opis}</p>
+          </div>
+          <div className="dashboard-date">
+            <CalendarDays size={18} aria-hidden="true" />
+            <span>{new Date().toLocaleDateString("bs-BA", { weekday: "long", day: "numeric", month: "long" })}</span>
+          </div>
+        </div>
 
-      {message.text && (
-        <p className={message.type === "error" ? "form-error" : "form-success"}>
-          {message.text}
-        </p>
-      )}
+        {message.text && (
+          <p className={message.type === "error" ? "form-error" : "form-success"}>
+            {message.text}
+          </p>
+        )}
 
-      <div className="cards-grid">
-        {loading
-          ? (
-            <div className="card">
-              <p style={{ color: "var(--text-muted)" }}>Ucitavanje statistika...</p>
-            </div>
-            )
-          : statCards.map((stat, index) => (
-            <div key={index} className={`stat-card ${stat.klasa}`}>
-              <div className="stat-value">{stat.vrijednost}</div>
-              <div className="stat-label">{stat.label}</div>
-            </div>
-          ))}
-      </div>
+        <div className="dashboard-stats">
+          {loading
+            ? Array.from({ length: 4 }).map((_, index) => (
+              <div className="stat-card dashboard-skeleton" key={index} aria-hidden="true" />
+            ))
+            : statCards.map((stat) => {
+              const StatIcon = STAT_ICON_BY_TYPE[stat.icon] || Activity;
+              return (
+                <div key={stat.label} className={`stat-card ${stat.klasa}`}>
+                  <div className="stat-card-topline">
+                    <span className="stat-icon"><StatIcon size={20} aria-hidden="true" /></span>
+                    <span className="stat-detail">{stat.detail}</span>
+                  </div>
+                  <div className="stat-value">{stat.vrijednost}</div>
+                  <div className="stat-label">{stat.label}</div>
+                </div>
+              );
+            })}
+        </div>
 
-      <div
-        className="dashboard-grid-layout"
-        style={{
-          display: "grid",
-          gridTemplateColumns: healthStats ? "repeat(auto-fit, minmax(320px, 1fr))" : "1fr",
-          gap: "24px",
-          marginTop: "24px"
-        }}
-      >
+        <div className="dashboard-content-grid">
+          <div className="dashboard-primary-column">
+            {uloga === "admin" && adminOverview && (
+              <section className="dashboard-panel setup-panel">
+                <div className="dashboard-panel-header">
+                  <div>
+                    <span className="dashboard-panel-kicker">Osnovne postavke</span>
+                    <h2>Spremnost sistema</h2>
+                    <p>Pratite šta je potrebno za svakodnevno korištenje laboratorija.</p>
+                  </div>
+                  <span className={`setup-score ${adminOverview.objekti > 0 && adminOverview.kabineti > 0 ? "complete" : ""}`}>
+                    {[
+                      adminOverview.users > 1,
+                      adminOverview.objekti > 0,
+                      adminOverview.kabineti > 0,
+                    ].filter(Boolean).length}/3
+                  </span>
+                </div>
+
+                <div className="setup-list">
+                  <button type="button" className="setup-row" onClick={() => navigate("/korisnici")}>
+                    <span className={`setup-status ${adminOverview.users > 1 ? "done" : ""}`}>
+                      {adminOverview.users > 1 ? <CheckCircle2 size={19} /> : <Users size={19} />}
+                    </span>
+                    <span className="setup-copy">
+                      <strong>Korisnički nalozi</strong>
+                      <small>{adminOverview.users > 1 ? `${adminOverview.users} korisnika spremno za rad` : "Dodajte profesore, studente i tehničare"}</small>
+                    </span>
+                    <ArrowRight size={18} aria-hidden="true" />
+                  </button>
+                  <button type="button" className="setup-row" onClick={() => navigate("/objekti")}>
+                    <span className={`setup-status ${adminOverview.objekti > 0 ? "done" : ""}`}>
+                      {adminOverview.objekti > 0 ? <CheckCircle2 size={19} /> : <Building2 size={19} />}
+                    </span>
+                    <span className="setup-copy">
+                      <strong>Objekti fakulteta</strong>
+                      <small>{adminOverview.objekti > 0 ? `${adminOverview.objekti} objekata evidentirano` : "Unesite zgrade i njihovo radno vrijeme"}</small>
+                    </span>
+                    <ArrowRight size={18} aria-hidden="true" />
+                  </button>
+                  <button type="button" className="setup-row" onClick={() => navigate("/objekti")}>
+                    <span className={`setup-status ${adminOverview.kabineti > 0 ? "done" : ""}`}>
+                      {adminOverview.kabineti > 0 ? <CheckCircle2 size={19} /> : <PackageOpen size={19} />}
+                    </span>
+                    <span className="setup-copy">
+                      <strong>Laboratorijski kabineti</strong>
+                      <small>{adminOverview.kabineti > 0 ? `${adminOverview.kabineti} kabineta dostupno` : "Dodajte prvi kabinet unutar objekta"}</small>
+                    </span>
+                    <ArrowRight size={18} aria-hidden="true" />
+                  </button>
+                </div>
+              </section>
+            )}
+
         {uloga === "tehnicar" && (
-          <div className="table-wrapper" style={{ height: "fit-content" }}>
+          <div className="table-wrapper dashboard-table">
             <div className="table-header">
               <h2>Prijavljeni kvarovi</h2>
+              <button type="button" className="table-link" onClick={() => navigate("/kvarovi")}>Svi kvarovi <ArrowRight size={16} /></button>
             </div>
             {loading || loadingEvidencije ? (
-              <p style={{ padding: "16px" }}>Ucitavanje...</p>
+              <p className="dashboard-loading-copy">Učitavanje...</p>
             ) : evidencije.length > 0 ? (
               <table>
                 <thead>
@@ -362,15 +479,15 @@ function Dashboard() {
                 <tbody>
                   {evidencije.map((evidencija) => (
                     <tr key={evidencija.id}>
-                      <td>{evidencija.opremaNaziv}</td>
-                      <td>{evidencija.korisnikImePrezime}</td>
-                      <td>{evidencija.komentar}</td>
-                      <td>
+                      <td data-label="Oprema">{evidencija.opremaNaziv}</td>
+                      <td data-label="Prijavio">{evidencija.korisnikImePrezime}</td>
+                      <td data-label="Komentar">{evidencija.komentar}</td>
+                      <td data-label="Status">
                         <span className={`badge ${getBadgeClass(evidencija.status)}`}>
                           {evidencija.status}
                         </span>
                       </td>
-                      <td>
+                      <td data-label="Akcije">
                         <div style={{ display: "flex", gap: "6px" }}>
                           {evidencija.status !== "Riješeno" && (
                             <button
@@ -401,7 +518,7 @@ function Dashboard() {
                 </tbody>
               </table>
             ) : (
-              <p style={{ padding: "16px", color: "var(--text-muted)" }}>
+              <p className="dashboard-empty-copy">
                 Nema prijavljenih kvarova.
               </p>
             )}
@@ -409,12 +526,19 @@ function Dashboard() {
         )}
 
         {uloga !== "tehnicar" && tableData && (
-          <div className="table-wrapper" style={{ height: "fit-content" }}>
+          <div className="table-wrapper dashboard-table">
             <div className="table-header">
               <h2>{tableData.naslov}</h2>
+              <button
+                type="button"
+                className="table-link"
+                onClick={() => navigate(uloga === "student" ? "/rezervacije" : "/zahtjevi")}
+              >
+                Prikaži sve <ArrowRight size={16} />
+              </button>
             </div>
             {loading ? (
-              <p style={{ padding: "16px" }}>Ucitavanje...</p>
+              <p className="dashboard-loading-copy">Učitavanje...</p>
             ) : tableData.redovi.length > 0 ? (
               <table>
                 <thead>
@@ -428,7 +552,7 @@ function Dashboard() {
                   {tableData.redovi.map((red, rowIndex) => (
                     <tr key={rowIndex}>
                       {red.map((celija, cellIndex) => (
-                        <td key={cellIndex}>
+                        <td key={cellIndex} data-label={tableData.kolone[cellIndex]}>
                           {getBadgeClass(celija)
                             ? <span className={`badge ${getBadgeClass(celija)}`}>{celija}</span>
                             : celija}
@@ -439,142 +563,66 @@ function Dashboard() {
                 </tbody>
               </table>
             ) : (
-              <p style={{ padding: "16px", color: "var(--text-muted)" }}>
+              <p className="dashboard-empty-copy">
                 {tableData.emptyMessage}
               </p>
             )}
           </div>
         )}
 
-        {healthStats && (
-          <div
-            className="card health-widget-card"
-            style={{
-              display: "flex",
-              flexDirection: "column",
-              alignItems: "center",
-              padding: "24px",
-              height: "fit-content",
-              boxShadow: "0 10px 30px rgba(0, 0, 0, 0.04)"
-            }}
-          >
-            <h3
-              style={{
-                fontSize: "16px",
-                fontWeight: "600",
-                color: "var(--text-primary)",
-                marginBottom: "20px",
-                alignSelf: "flex-start"
-              }}
-            >
-              Zdravlje laboratorije
-            </h3>
-
-            <div
-              style={{
-                position: "relative",
-                width: "150px",
-                height: "150px",
-                display: "flex",
-                alignItems: "center",
-                justifyContent: "center",
-                marginBottom: "20px"
-              }}
-            >
-              <svg width="150" height="150" viewBox="0 0 150 150" style={{ transform: "rotate(-90deg)" }}>
-                <circle
-                  cx="75"
-                  cy="75"
-                  r="60"
-                  fill="transparent"
-                  stroke="var(--border-color)"
-                  strokeWidth="10"
-                />
-                <circle
-                  cx="75"
-                  cy="75"
-                  r="60"
-                  fill="transparent"
-                  stroke={healthStats.healthColor}
-                  strokeWidth="10"
-                  strokeDasharray={2 * Math.PI * 60}
-                  strokeDashoffset={2 * Math.PI * 60 * (1 - healthStats.procenat / 100)}
-                  strokeLinecap="round"
-                  style={{ transition: "stroke-dashoffset 0.8s ease-in-out" }}
-                />
-              </svg>
-              <div style={{ position: "absolute", textAlign: "center" }}>
-                <span style={{ fontSize: "28px", fontWeight: "800", color: "var(--text-primary)" }}>
-                  {healthStats.procenat}%
-                </span>
-                <div style={{ fontSize: "12px", color: "var(--text-muted)", marginTop: "2px" }}>
-                  Ispravno
-                </div>
-              </div>
-            </div>
-
-            <div style={{ width: "100%", display: "grid", gap: "10px", marginTop: "10px" }}>
-              <div
-                style={{
-                  display: "flex",
-                  justifyContent: "space-between",
-                  fontSize: "13px",
-                  paddingBottom: "6px",
-                  borderBottom: "1px solid var(--border-color)"
-                }}
-              >
-                <span style={{ display: "flex", alignItems: "center", gap: "6px" }}>
-                  <span style={{ width: "8px", height: "8px", borderRadius: "50%", background: "#10b981" }} />
-                  Ispravna oprema
-                </span>
-                <strong style={{ color: "var(--text-primary)" }}>
-                  {healthStats.ispravno} / {healthStats.total}
-                </strong>
-              </div>
-              <div
-                style={{
-                  display: "flex",
-                  justifyContent: "space-between",
-                  fontSize: "13px",
-                  paddingBottom: "6px",
-                  borderBottom: "1px solid var(--border-color)"
-                }}
-              >
-                <span style={{ display: "flex", alignItems: "center", gap: "6px" }}>
-                  <span style={{ width: "8px", height: "8px", borderRadius: "50%", background: "#ef4444" }} />
-                  U kvaru
-                </span>
-                <strong style={{ color: "var(--text-primary)" }}>{healthStats.uKvaru}</strong>
-              </div>
-              <div
-                style={{
-                  display: "flex",
-                  justifyContent: "space-between",
-                  fontSize: "13px",
-                  paddingBottom: "6px",
-                  borderBottom: "1px solid var(--border-color)"
-                }}
-              >
-                <span style={{ display: "flex", alignItems: "center", gap: "6px" }}>
-                  <span style={{ width: "8px", height: "8px", borderRadius: "50%", background: "#f59e0b" }} />
-                  Na servisu
-                </span>
-                <strong style={{ color: "var(--text-primary)" }}>{healthStats.naServisu}</strong>
-              </div>
-              {healthStats.otpisano > 0 && (
-                <div style={{ display: "flex", justifyContent: "space-between", fontSize: "13px", paddingBottom: "6px" }}>
-                  <span style={{ display: "flex", alignItems: "center", gap: "6px" }}>
-                    <span style={{ width: "8px", height: "8px", borderRadius: "50%", background: "#6b7280" }} />
-                    Otpisana oprema
-                  </span>
-                  <strong style={{ color: "var(--text-primary)" }}>{healthStats.otpisano}</strong>
-                </div>
-              )}
-            </div>
           </div>
-        )}
-      </div>
 
+          <aside className="dashboard-secondary-column">
+            <section className="dashboard-panel quick-actions-panel">
+              <div className="dashboard-panel-header compact">
+                <div>
+                  <span className="dashboard-panel-kicker">Prečice</span>
+                  <h2>Brze akcije</h2>
+                </div>
+              </div>
+              <div className="quick-actions-list">
+                {(QUICK_ACTIONS_BY_ROLE[uloga] || []).map((action) => {
+                  const ActionIcon = action.icon;
+                  return (
+                    <button key={action.path} type="button" className="quick-action-row" onClick={() => navigate(action.path)}>
+                      <span className="quick-action-icon"><ActionIcon size={19} aria-hidden="true" /></span>
+                      <span>
+                        <strong>{action.label}</strong>
+                        <small>{action.description}</small>
+                      </span>
+                      <ArrowRight size={17} aria-hidden="true" />
+                    </button>
+                  );
+                })}
+              </div>
+            </section>
+
+            {healthStats && (
+              <section className="dashboard-panel health-widget-card">
+                <div className="dashboard-panel-header compact">
+                  <div>
+                    <span className="dashboard-panel-kicker">Inventar</span>
+                    <h2>Zdravlje laboratorije</h2>
+                  </div>
+                  <Activity size={20} aria-hidden="true" />
+                </div>
+
+                <div className="health-summary">
+                  <div className="health-ring" style={{ "--health-progress": `${healthStats.procenat * 3.6}deg`, "--health-color": healthStats.healthColor }}>
+                    <div><strong>{healthStats.procenat}%</strong><span>ispravno</span></div>
+                  </div>
+                  <div className="health-legend">
+                    <div><span className="health-dot green" />Ispravna <strong>{healthStats.ispravno}</strong></div>
+                    <div><span className="health-dot red" />U kvaru <strong>{healthStats.uKvaru}</strong></div>
+                    <div><span className="health-dot amber" />Na servisu <strong>{healthStats.naServisu}</strong></div>
+                    {healthStats.otpisano > 0 && <div><span className="health-dot gray" />Otpisana <strong>{healthStats.otpisano}</strong></div>}
+                  </div>
+                </div>
+              </section>
+            )}
+          </aside>
+        </div>
+      </div>
     </Layout>
   );
 }
