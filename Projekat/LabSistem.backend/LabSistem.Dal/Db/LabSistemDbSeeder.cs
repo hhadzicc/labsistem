@@ -9,6 +9,56 @@ namespace LABsistem.Dal.Db
 {
     public static class LabSistemDbSeeder
     {
+        public static async Task SeedBootstrapAdminAsync(
+            LabSistemDbContext dbContext,
+            string? name,
+            string? email,
+            string? username,
+            string? password,
+            CancellationToken cancellationToken = default)
+        {
+            if (new[] { name, email, username, password }.Any(string.IsNullOrWhiteSpace))
+            {
+                throw new InvalidOperationException(
+                    "Bootstrap admin zahtijeva Name, Email, Username i Password konfiguraciju.");
+            }
+
+            if (password!.Length < 12)
+            {
+                throw new InvalidOperationException(
+                    "Bootstrap admin lozinka mora imati najmanje 12 karaktera.");
+            }
+
+            if (await dbContext.Korisnici.AnyAsync(
+                    user => user.Uloga == UlogaKorisnika.Admin,
+                    cancellationToken))
+            {
+                return;
+            }
+
+            if (await dbContext.Korisnici.AnyAsync(
+                    user => user.Username == username || user.Email == email,
+                    cancellationToken))
+            {
+                throw new InvalidOperationException(
+                    "Bootstrap admin username ili email već pripada drugom korisniku.");
+            }
+
+            dbContext.Korisnici.Add(new Korisnik
+            {
+                ImePrezime = name!.Trim(),
+                Email = email!.Trim(),
+                Username = username!.Trim(),
+                Password = BCrypt.Net.BCrypt.HashPassword(password),
+                Uloga = UlogaKorisnika.Admin,
+                MustChangePassword = true,
+                EmailVerified = true,
+                EmailVerifiedAtUtc = DateTime.UtcNow
+            });
+
+            await dbContext.SaveChangesAsync(cancellationToken);
+        }
+
         public static async Task SeedDefaultUsersAsync(LabSistemDbContext dbContext, CancellationToken cancellationToken = default)
         {
             var verifiedAtUtc = DateTime.UtcNow;

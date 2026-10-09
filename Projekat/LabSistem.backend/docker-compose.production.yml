@@ -23,9 +23,16 @@ services:
       ASPNETCORE_ENVIRONMENT: ${ASPNETCORE_ENVIRONMENT}
       ASPNETCORE_URLS: ${ASPNETCORE_URLS}
       ConnectionStrings__Default: ${CONNECTION_STRING}
+      Jwt__Key: ${JWT_KEY}
       FRONTEND_BASE_URL: ${FRONTEND_BASE_URL}
       RESEND_API_KEY: ${RESEND_API_KEY}
       FROM_EMAIL: ${FROM_EMAIL}
+      SeedData__DemoUsers: ${SEED_DEMO_USERS:-false}
+      BootstrapAdmin__Enabled: ${BOOTSTRAP_ADMIN_ENABLED:-false}
+      BootstrapAdmin__Name: ${BOOTSTRAP_ADMIN_NAME:-}
+      BootstrapAdmin__Email: ${BOOTSTRAP_ADMIN_EMAIL:-}
+      BootstrapAdmin__Username: ${BOOTSTRAP_ADMIN_USERNAME:-}
+      BootstrapAdmin__Password: ${BOOTSTRAP_ADMIN_PASSWORD:-}
       TZ: Europe/Sarajevo
     ports:
       - "8080:8080"

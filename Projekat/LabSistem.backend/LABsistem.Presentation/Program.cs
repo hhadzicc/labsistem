@@ -15,6 +15,7 @@ using Microsoft.EntityFrameworkCore;
 using Microsoft.IdentityModel.Tokens;
 using LABsistem.Api.Validators;
 using LABsistem.Presentation.BackgroundServices;
+using Microsoft.AspNetCore.Authorization;
 
 var builder = WebApplication.CreateBuilder(args);
 LoadDotEnvFile(Path.Combine(builder.Environment.ContentRootPath, ".env"));
@@ -22,10 +23,18 @@ LoadDotEnvFile(Path.GetFullPath(Path.Combine(builder.Environment.ContentRootPath
 builder.Configuration.AddEnvironmentVariables();
 
 var connectionString = builder.Configuration.GetConnectionString("Default");
-Console.WriteLine($"TRENUTNI CONNECTION STRING JE: {connectionString}");
+if (!builder.Environment.IsEnvironment("Testing") && string.IsNullOrWhiteSpace(connectionString))
+{
+    throw new InvalidOperationException("ConnectionStrings:Default nije konfigurisan.");
+}
 
 var jwtSettings = builder.Configuration.GetSection("Jwt").Get<JwtSettings>()
     ?? throw new InvalidOperationException("JWT konfiguracija nije pronadjena.");
+
+if (string.IsNullOrWhiteSpace(jwtSettings.Key) || jwtSettings.Key.Length < 32)
+{
+    throw new InvalidOperationException("Jwt:Key mora biti konfigurisan i imati najmanje 32 karaktera.");
+}
 
 if (!builder.Environment.IsEnvironment("Testing"))
 {
@@ -120,6 +129,13 @@ builder.Services
         };
     });
 
+builder.Services.AddAuthorization(options =>
+{
+    options.FallbackPolicy = new AuthorizationPolicyBuilder()
+        .RequireAuthenticatedUser()
+        .Build();
+});
+
 builder.Services.AddCors(options =>
 {
     options.AddPolicy("AllowFrontend", policy =>
@@ -144,15 +160,31 @@ using (var scope = app.Services.CreateScope())
         if (!app.Environment.IsEnvironment("Testing"))
         {
             context.Database.Migrate();
-            await LabSistemDbSeeder.SeedDefaultUsersAsync(context);
-            await LabSistemDbSeeder.SeedDefaultObjektiAsync(context);
-            await LabSistemDbSeeder.SeedDefaultKabinetiAsync(context);
+
+            if (app.Configuration.GetValue<bool>("SeedData:DemoUsers"))
+            {
+                await LabSistemDbSeeder.SeedDefaultUsersAsync(context);
+                await LabSistemDbSeeder.SeedDefaultObjektiAsync(context);
+                await LabSistemDbSeeder.SeedDefaultKabinetiAsync(context);
+            }
+
+            if (app.Configuration.GetValue<bool>("BootstrapAdmin:Enabled"))
+            {
+                await LabSistemDbSeeder.SeedBootstrapAdminAsync(
+                    context,
+                    app.Configuration["BootstrapAdmin:Name"],
+                    app.Configuration["BootstrapAdmin:Email"],
+                    app.Configuration["BootstrapAdmin:Username"],
+                    app.Configuration["BootstrapAdmin:Password"]);
+            }
+
             Console.WriteLine("Migracije su uspjesno provjerene/primijenjene.");
         }
     }
     catch (Exception ex)
     {
-        Console.WriteLine($"Greska pri migraciji: {ex.Message}");
+        Console.Error.WriteLine($"Greska pri migraciji: {ex.Message}");
+        throw;
     }
 }
 

@@ -15,6 +15,55 @@ public class LabSistemDbSeederTests
     }
 
     [Fact]
+    public async Task SeedBootstrapAdminAsync_WithEmptyDatabase_CreatesRestrictedAdmin()
+    {
+        using var context = GetInMemoryDbContext();
+
+        await LabSistemDbSeeder.SeedBootstrapAdminAsync(
+            context,
+            "Production Admin",
+            "admin@example.com",
+            "productionadmin",
+            "StrongBootstrapPassword123!");
+
+        var admin = await context.Korisnici.SingleAsync();
+
+        Assert.Equal(UlogaKorisnika.Admin, admin.Uloga);
+        Assert.True(admin.MustChangePassword);
+        Assert.True(admin.EmailVerified);
+        Assert.True(BCrypt.Net.BCrypt.Verify("StrongBootstrapPassword123!", admin.Password));
+    }
+
+    [Fact]
+    public async Task SeedBootstrapAdminAsync_WithExistingAdmin_DoesNotOverwriteAccount()
+    {
+        using var context = GetInMemoryDbContext();
+        var passwordHash = BCrypt.Net.BCrypt.HashPassword("ExistingPassword123!");
+
+        context.Korisnici.Add(new Korisnik
+        {
+            ImePrezime = "Existing Admin",
+            Email = "existing.admin@example.com",
+            Username = "existingadmin",
+            Password = passwordHash,
+            Uloga = UlogaKorisnika.Admin
+        });
+        await context.SaveChangesAsync();
+
+        await LabSistemDbSeeder.SeedBootstrapAdminAsync(
+            context,
+            "Replacement Admin",
+            "replacement.admin@example.com",
+            "replacementadmin",
+            "ReplacementPassword123!");
+
+        var admin = await context.Korisnici.SingleAsync();
+
+        Assert.Equal("existingadmin", admin.Username);
+        Assert.Equal(passwordHash, admin.Password);
+    }
+
+    [Fact]
     public async Task SeedDefaultUsersAsync_WithExistingSeedUsersAndEmailConflicts_OverwritesExpectedValues()
     {
         using var context = GetInMemoryDbContext();
