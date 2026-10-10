@@ -1,10 +1,12 @@
 import { useEffect, useState } from "react";
+import { RefreshCw } from "lucide-react";
 import Layout from "../components/Layout";
 import api from "../api/client";
 
 function Zakazivanje() {
   const [termini, setTermini] = useState([]);
   const [loading, setLoading] = useState(true);
+  const [loadError, setLoadError] = useState(false);
   const [message, setMessage] = useState({ type: "", text: "" });
   const [equipmentModalOpen, setEquipmentModalOpen] = useState(false);
   const [selectedCabinetEquipment, setSelectedCabinetEquipment] = useState([]);
@@ -19,14 +21,17 @@ function Zakazivanje() {
 
   async function loadDostupniTermini() {
     setLoading(true);
+    setLoadError(false);
+    setMessage({ type: "", text: "" });
     try {
       const response = await api.get("/Rezervacija/dostupni-studentima");
       const filtered = response.data.filter((t) => {
         const terminEnd = new Date(`${t.datum.split("T")[0]}T${t.vrijemeKraja}`);
-        return terminEnd > new Date();
+        return terminEnd > new Date() && t.statusPrijave !== "Odobren";
       });
       setTermini(filtered);
     } catch (error) {
+      setLoadError(true);
       setMessage({ type: "error", text: "Neuspjesno ucitavanje termina." });
     } finally {
       setLoading(false);
@@ -100,30 +105,36 @@ function Zakazivanje() {
         <p>Prijavite se na termine koje su profesori ucinili dostupnim.</p>
       </div>
 
-      <div className="card">
+      <div className="card users-list-card">
         {message.text && (
           <p className={message.type === "error" ? "form-error" : "form-success"}>
             {message.text}
           </p>
         )}
 
-        <div className="termini-list-header termini-list-row termini-grid-7">
-          <span>Datum</span>
-          <span>Vrijeme</span>
-          <span>Kabinet</span>
-          <span>Profesor</span>
-          <span>Popunjenost</span>
-          <span>Vidljivost</span>
-          <span>Akcija</span>
-        </div>
+        {!loading && !loadError && termini.length > 0 && (
+          <div className="termini-list-header termini-list-row termini-grid-7">
+            <span>Datum</span>
+            <span>Vrijeme</span>
+            <span>Kabinet</span>
+            <span>Profesor</span>
+            <span>Popunjenost</span>
+            <span>Vidljivost</span>
+            <span>Akcija</span>
+          </div>
+        )}
 
         {loading ? (
           <div className="users-empty-state">Ucitavanje termina...</div>
+        ) : loadError ? (
+          <div className="users-empty-state">
+            <button className="button secondary" onClick={loadDostupniTermini}>
+              <RefreshCw size={16} aria-hidden="true" /> Ponovo ucitaj
+            </button>
+          </div>
         ) : termini.length > 0 ? (
           <div className="users-list">
-            {termini
-              .filter(t => t.statusPrijave !== "Odobren") // Ako je odobren, on je u "Moje rezervacije"
-              .map((t) => (
+            {termini.map((t) => (
                 <div className="termini-list-row users-list-item termini-grid-7" key={t.id}>
                   <span data-label="Datum" style={{ fontWeight: 700 }}>{new Date(t.datum).toLocaleDateString("de-DE")}</span>
                   <span data-label="Vrijeme">
@@ -160,7 +171,9 @@ function Zakazivanje() {
               ))}
           </div>
         ) : (
-          <div className="users-empty-state">Trenutno nema dostupnih termina za prijavu.</div>
+          <div className="users-empty-state" role="status">
+            Trenutno nema dostupnih termina za zakazivanje.
+          </div>
         )}
       </div>
 

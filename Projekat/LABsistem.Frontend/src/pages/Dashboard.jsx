@@ -225,7 +225,7 @@ function Dashboard() {
 
     setStatCards([
       { label: "Aktivne rezervacije", vrijednost: String(mojeRezervacije.length), klasa: "blue", icon: "calendar", detail: "Predstojeći termini" },
-      { label: "Dostupni termini", vrijednost: String(dostupniTermini.length), klasa: "green", icon: "rooms", detail: "Otvoreno za prijavu" },
+      { label: "Dostupni termini", vrijednost: String(dostupniTermini.filter((termin) => !termin.statusPrijave || termin.statusPrijave === "Otkazan").length), klasa: "green", icon: "rooms", detail: "Otvoreno za prijavu" },
       { label: "Zahtjevi na čekanju", vrijednost: String(pendingRequests), klasa: "amber", icon: "requests", detail: "Čekaju odobrenje" },
     ]);
 

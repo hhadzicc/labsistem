@@ -251,17 +251,27 @@ public static class DemoDataSeeder
             new Oprema { Naziv = "Cisco switch 24P", Kategorija = "Mrežna oprema", SerijskiBroj = 900003, stanje = StatusOpreme.UKvaru, KreatorID = technician.ID, KabinetID = networkLab.ID },
             new Oprema { Naziv = "Osciloskop", Kategorija = "Mjerni uređaj", SerijskiBroj = 900004, stanje = StatusOpreme.NaServisu, KreatorID = technician.ID, KabinetID = electronicsLab.ID },
             new Oprema { Naziv = "Laptop za nastavu", Kategorija = "Računar", SerijskiBroj = 900005, stanje = StatusOpreme.Ispravno, KreatorID = technician.ID, KabinetID = networkLab.ID },
-            new Oprema { Naziv = "3D printer", Kategorija = "Laboratorijska oprema", SerijskiBroj = 900006, stanje = StatusOpreme.Ispravno, KreatorID = technician.ID, KabinetID = electronicsLab.ID }
+            new Oprema { Naziv = "3D printer", Kategorija = "Laboratorijska oprema", SerijskiBroj = 900006, stanje = StatusOpreme.Ispravno, KreatorID = technician.ID, KabinetID = electronicsLab.ID },
+            new Oprema { Naziv = "Monitor za rashod", Kategorija = "Monitor", SerijskiBroj = 900007, stanje = StatusOpreme.Otpisano, KreatorID = technician.ID, KabinetID = networkLab.ID },
+            new Oprema { Naziv = "Digitalni multimetar", Kategorija = "Mjerni uređaj", SerijskiBroj = 900008, stanje = StatusOpreme.Ispravno, KreatorID = technician.ID, KabinetID = electronicsLab.ID }
         };
         context.Oprema.AddRange(equipment);
 
         var today = DateTime.UtcNow.Date;
         var terms = new[]
         {
-            NewTerm(today.AddDays(1), new TimeSpan(9, 0, 0), softwareLab.ID, professor.ID, StatusTermina.Rezervisan, true),
-            NewTerm(today.AddDays(2), new TimeSpan(12, 0, 0), networkLab.ID, professor.ID, StatusTermina.Slobodan, true),
-            NewTerm(today.AddDays(4), new TimeSpan(15, 0, 0), electronicsLab.ID, professor.ID, StatusTermina.Slobodan, true),
-            NewTerm(today.AddDays(-2), new TimeSpan(10, 0, 0), softwareLab.ID, professor.ID, StatusTermina.Rezervisan, false)
+            NewTerm(today.AddDays(3), new TimeSpan(9, 0, 0), softwareLab.ID, professor.ID, StatusTermina.Rezervisan, true),
+            NewTerm(today.AddDays(4), new TimeSpan(12, 0, 0), softwareLab.ID, professor.ID, StatusTermina.Rezervisan, true),
+            NewTerm(today.AddDays(5), new TimeSpan(15, 0, 0), softwareLab.ID, professor.ID, StatusTermina.Rezervisan, true),
+            NewTerm(today.AddDays(-2), new TimeSpan(10, 0, 0), softwareLab.ID, professor.ID, StatusTermina.Rezervisan, false),
+            NewTerm(today.AddDays(2), new TimeSpan(9, 0, 0), softwareLab.ID, professor.ID, StatusTermina.Rezervisan, true, 6),
+            NewTerm(today.AddDays(6), new TimeSpan(13, 0, 0), softwareLab.ID, professor.ID, StatusTermina.Rezervisan, true, 18),
+            NewTerm(today.AddDays(7), new TimeSpan(15, 0, 0), electronicsLab.ID, professor.ID, StatusTermina.Rezervisan, true, 8),
+            NewTerm(today.AddDays(3), new TimeSpan(14, 0, 0), softwareLab.ID, professor.ID, StatusTermina.Rezervisan, false, 4),
+            NewTerm(today.AddDays(2), new TimeSpan(12, 0, 0), networkLab.ID, technician.ID, StatusTermina.Slobodan, false),
+            NewTerm(today.AddDays(4), new TimeSpan(15, 0, 0), electronicsLab.ID, professor.ID, StatusTermina.Otkazan, false),
+            NewTerm(today, new TimeSpan(16, 0, 0), softwareLab.ID, professor.ID, StatusTermina.Rezervisan, false),
+            NewTerm(today.AddDays(-1), new TimeSpan(10, 0, 0), networkLab.ID, professor.ID, StatusTermina.Rezervisan, false)
         };
         context.Termini.AddRange(terms);
         await context.SaveChangesAsync(cancellationToken);
@@ -269,13 +279,14 @@ public static class DemoDataSeeder
         context.Zahtjevi.AddRange(
             new Zahtjev { StudentID = student.ID, TerminID = terms[0].ID, Komentar = "Vježbe iz baza podataka", StatusZahtjeva = StatusZahtjeva.Odobren },
             new Zahtjev { StudentID = student.ID, TerminID = terms[1].ID, Komentar = "Priprema laboratorijske vježbe", StatusZahtjeva = StatusZahtjeva.NaCekanju },
-            new Zahtjev { StudentID = student.ID, TerminID = terms[2].ID, Komentar = "Rad na projektnom zadatku", StatusZahtjeva = StatusZahtjeva.Odbijen });
+            new Zahtjev { StudentID = student.ID, TerminID = terms[2].ID, Komentar = "Rad na projektnom zadatku", StatusZahtjeva = StatusZahtjeva.Odbijen },
+            new Zahtjev { StudentID = student.ID, TerminID = terms[9].ID, Komentar = "Termin otkazan zbog servisa opreme", StatusZahtjeva = StatusZahtjeva.Otkazan });
 
         context.Evidencije.AddRange(
             new Evidencija
             {
                 PrijavljenoU = DateTime.UtcNow.AddHours(-5),
-                Status = "Prijavljeno",
+                Status = "Kvar",
                 Komentar = "Mrežni switch povremeno gubi konekciju.",
                 OpremaID = equipment[2].ID,
                 KorisnikID = professor.ID,
@@ -288,13 +299,29 @@ public static class DemoDataSeeder
                 Komentar = "Osciloskop ne prikazuje signal na drugom kanalu.",
                 OpremaID = equipment[3].ID,
                 KorisnikID = student.ID,
+                ObradioKorisnikID = technician.ID,
+                Rjesenje = "Uređaj je poslan na dijagnostiku i kalibraciju."
+            },
+            new Evidencija
+            {
+                PrijavljenoU = DateTime.UtcNow.AddDays(-4),
+                RijesenoU = DateTime.UtcNow.AddDays(-3),
+                Status = "Rijeseno",
+                Komentar = "Projektor se gasio nakon nekoliko minuta rada.",
+                Rjesenje = "Očišćen filter i zamijenjen ventilator. Projektor je testiran i vraćen u upotrebu.",
+                OpremaID = equipment[1].ID,
+                KorisnikID = professor.ID,
+                ProfesorID = professor.ID,
                 ObradioKorisnikID = technician.ID
             });
 
         context.Obavijesti.AddRange(
-            new Obavijest { KorisnikID = student.ID, TerminID = terms[0].ID, Novosti = "Zahtjev za termin je odobren.", Dostupnost = true },
-            new Obavijest { KorisnikID = professor.ID, Novosti = "Nova prijava kvara čeka pregled.", Dostupnost = true },
-            new Obavijest { KorisnikID = technician.ID, Novosti = "Dodijeljena vam je prijava za osciloskop.", Dostupnost = true });
+            new Obavijest { KorisnikID = student.ID, TerminID = terms[0].ID, Novosti = "Zahtjev za termin je odobren.", Dostupnost = false, DatumKreiranja = DateTime.UtcNow.AddHours(-2) },
+            new Obavijest { KorisnikID = student.ID, TerminID = terms[9].ID, Novosti = "Termin je otkazan zbog servisa opreme.", Dostupnost = true, DatumKreiranja = DateTime.UtcNow.AddDays(-1) },
+            new Obavijest { KorisnikID = professor.ID, TerminID = terms[1].ID, Novosti = "Novi zahtjev studenta čeka odobrenje.", Dostupnost = false, DatumKreiranja = DateTime.UtcNow.AddHours(-1) },
+            new Obavijest { KorisnikID = professor.ID, Novosti = "Projektor A101 je popravljen i vraćen u upotrebu.", Dostupnost = true, DatumKreiranja = DateTime.UtcNow.AddDays(-3) },
+            new Obavijest { KorisnikID = technician.ID, Novosti = "Nova prijava kvara mrežnog switcha čeka pregled.", Dostupnost = false, DatumKreiranja = DateTime.UtcNow.AddHours(-5) },
+            new Obavijest { KorisnikID = technician.ID, Novosti = "Dodijeljena vam je prijava za osciloskop.", Dostupnost = true, DatumKreiranja = DateTime.UtcNow.AddDays(-1) });
 
         await context.SaveChangesAsync(cancellationToken);
     }
@@ -305,17 +332,18 @@ public static class DemoDataSeeder
         int cabinetId,
         int professorId,
         StatusTermina status,
-        bool visible) =>
+        bool visible,
+        int limit = 12) =>
         new()
         {
             Datum = date,
             VrijemePocetka = start,
             VrijemeKraja = start.Add(TimeSpan.FromHours(2)),
             KreatorID = professorId,
-            ProfesorID = professorId,
+            ProfesorID = status == StatusTermina.Slobodan ? null : professorId,
             KabinetID = cabinetId,
             StatusTermina = status,
-            LimitOsoba = 12,
+            LimitOsoba = status == StatusTermina.Slobodan ? null : limit,
             VidljivoStudentima = visible
         };
 }
